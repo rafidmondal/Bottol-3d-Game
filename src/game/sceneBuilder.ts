@@ -1265,7 +1265,7 @@ export class SceneBuilder {
     const group = new THREE.Group();
     group.position.set(obs.position.x, 0, obs.position.z);
 
-    const targetH = obs.size.y || 0.5; // Landing elevation above table (0.0)
+    const targetH = obs.topY !== undefined ? obs.topY : (obs.size.y || 0.5); // Landing elevation above table (0.0)
     const floorY = -1.85; // Room floor Y
     const totalH = targetH - floorY; // Height from floor to landing surface
     const midY = (targetH + floorY) * 0.5; // Center Y between floor and top

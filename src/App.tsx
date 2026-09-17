@@ -13,6 +13,7 @@ import { AchievementsModal } from './components/AchievementsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ProfileModal } from './components/ProfileModal';
 import { HowToPlayModal } from './components/HowToPlayModal';
+import { AboutModal } from './components/AboutModal';
 import { DailyRewardModal } from './components/DailyRewardModal';
 import { GameCanvas } from './components/GameCanvas';
 import { SceneBuilder } from './game/sceneBuilder';
@@ -81,7 +82,8 @@ export default function App() {
     currentScreen === 'ACHIEVEMENTS' ||
     currentScreen === 'SETTINGS' ||
     currentScreen === 'PROFILE' ||
-    currentScreen === 'HOW_TO_PLAY';
+    currentScreen === 'HOW_TO_PLAY' ||
+    currentScreen === 'ABOUT';
 
   const [homeCanvasKey, setHomeCanvasKey] = useState(0);
 
@@ -354,6 +356,11 @@ export default function App() {
         {/* HOW TO PLAY MODAL */}
         {currentScreen === 'HOW_TO_PLAY' && (
           <HowToPlayModal onBack={() => setCurrentScreen('HOME')} />
+        )}
+
+        {/* ABOUT & GAME DOCUMENTATION MODAL */}
+        {currentScreen === 'ABOUT' && (
+          <AboutModal onClose={() => setCurrentScreen('HOME')} />
         )}
       </main>
 

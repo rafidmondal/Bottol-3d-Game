@@ -16,7 +16,8 @@ export type Screen =
   | 'ACHIEVEMENTS'
   | 'SETTINGS'
   | 'PROFILE'
-  | 'HOW_TO_PLAY';
+  | 'HOW_TO_PLAY'
+  | 'ABOUT';
 
 export type AiDifficulty = 'easy' | 'medium' | 'hard';
 
@@ -152,6 +153,10 @@ export interface TargetObstacle {
   position: { x: number; y: number; z: number };
   size: { x: number; y: number; z: number };
   radius?: number;
+  halfWidth?: number;
+  halfDepth?: number;
+  topY?: number;
+  bottomY?: number;
   mesh?: any;
   speed?: number;
   direction?: number;
@@ -167,6 +172,7 @@ export interface LevelConfig {
   targetHeight: number;
   targetDistance: number;
   targetRadius: number;
+  targetX?: number;
   obstacleType?: ObstacleType;
   movingSpeed?: number;
   movingDistance?: number;

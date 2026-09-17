@@ -190,7 +190,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         sb.setTableMode(true);
       }
       if (sb.targetMesh) {
-        sb.targetMesh.position.set(0, 0.008, cfg.targetDistance);
+        sb.targetMesh.position.set(cfg.targetX || 0, 0.008, cfg.targetDistance);
         sb.targetMesh.visible = cfg.obstacleType === 'none';
       }
     }

@@ -1,15 +1,17 @@
-import React from 'react';
-import { Gamepad2, Trophy, Shirt, Star, Sparkles, User, Infinity } from 'lucide-react';
+import React, { useState } from 'react';
+import { Gamepad2, Trophy, Shirt, Star, Sparkles, User, Infinity, BookOpen } from 'lucide-react';
 import { Screen } from '../types';
 import { audio } from '../services/audio';
 import { isEndlessUnlocked, getMaxUnlockedLevel } from '../services/storage';
 import { BottleFlipLogo } from './BottleFlipLogo';
+import { PolicyButton, PolicyModal } from './PolicyModal';
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
+  const [showPolicies, setShowPolicies] = useState(false);
   const endlessUnlocked = isEndlessUnlocked();
   const maxUnlocked = getMaxUnlockedLevel();
   return (
@@ -234,7 +236,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             <span className="truncate">PRACTICE</span>
           </button>
         </div>
+
+        {/* 5. VERY BOTTOM "ABOUT / GAME DOCS" SMALL BOX & "ALL POLICIES" BUTTON (Requested: "about page box er left ba right a eta dau") */}
+        <div className="mt-1.5 flex items-center justify-center gap-2 pointer-events-auto">
+          <button
+            id="btn-about-docs"
+            onClick={() => {
+              audio.playButton();
+              onNavigate('ABOUT');
+            }}
+            className="group flex items-center gap-1.5 px-3 py-0.5 sm:py-1 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/60 hover:border-sky-500/50 rounded-full shadow-lg backdrop-blur-sm transition-all hover:scale-105 active:scale-95 text-slate-400 hover:text-sky-300 pointer-events-auto"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-sky-400 group-hover:rotate-12 transition-transform" />
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wide uppercase font-['Fredoka']">
+              ABOUT GAME & DOCS
+            </span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30">
+              v1.1
+            </span>
+          </button>
+
+          {/* All Policies custom button provided by user */}
+          <PolicyButton onClick={() => setShowPolicies(true)} />
+        </div>
       </div>
+
+      {/* Policies Modal iframe */}
+      <PolicyModal isOpen={showPolicies} onClose={() => setShowPolicies(false)} />
     </div>
   );
 };
