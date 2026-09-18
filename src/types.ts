@@ -41,6 +41,18 @@ export interface GameSettings {
   handedness: 'Right' | 'Left';
 }
 
+export type BottleShape =
+  | 'classic'
+  | 'round'
+  | 'box'
+  | 'tall'
+  | 'short'
+  | 'soda'
+  | 'sport'
+  | 'diamond'
+  | 'gold'
+  | 'galaxy';
+
 export interface SkinItem {
   id: string;
   name: string;
@@ -54,6 +66,10 @@ export interface SkinItem {
   transmission?: number;
   emissive?: string;
   description?: string;
+  shape?: BottleShape;
+  liquidColor?: string;
+  labelText?: string;
+  tag?: string;
 }
 
 export interface UserSkinsState {

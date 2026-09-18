@@ -523,6 +523,536 @@ export function getBottleLabelTexture(skinColor: string, labelText = 'FLIP'): TH
   return tex;
 }
 
+// Standalone 3D Bottle Generator supporting all unique shapes & materials
+export function createStandaloneBottleMesh(
+  skinId = 'classic',
+  capId = 'capRed',
+  overrides?: {
+    bodyTint?: string;
+    capColor?: string;
+    liquidColor?: string;
+    labelText?: string;
+  }
+): THREE.Group {
+  const bottleGroup = new THREE.Group();
+
+  const skin: SkinItem =
+    SKINS_BOTTLES.find((s) => s.id === skinId) || SKINS_BOTTLES[0];
+  const cap: SkinItem =
+    SKINS_CAPS.find((c) => c.id === capId) || SKINS_CAPS[0];
+
+  const baseOffsetY = -0.14;
+  const bodyColor = overrides?.bodyTint || skin.color;
+  const capColor = overrides?.capColor || cap.color;
+  const liquidColor = overrides?.liquidColor || (skin.liquidColor || skin.accentColor || skin.color);
+  const labelText = overrides?.labelText || (skin.labelText || 'FLIP');
+  const shape = skin.shape || 'classic';
+
+  // 1. CAP MATERIAL
+  let capMat: THREE.Material;
+  if (cap.transmission && cap.transmission > 0.5) {
+    capMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(capColor),
+      roughness: 0.05,
+      metalness: 0.1,
+      transmission: 0.85,
+      transparent: true,
+      opacity: 0.9,
+      ior: 1.55,
+      clearcoat: 1.0,
+    });
+  } else {
+    capMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(capColor),
+      roughness: cap.roughness ?? 0.22,
+      metalness: cap.metalness ?? 0.2,
+      bumpMap: getCapRibBumpTexture(),
+      bumpScale: 0.045,
+      ...(cap.emissive ? { emissive: new THREE.Color(cap.emissive), emissiveIntensity: 0.6 } : {}),
+    });
+  }
+
+  // 2. BODY MATERIAL
+  let bodyMat: THREE.Material;
+  if (shape === 'gold') {
+    bodyMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#eab308'),
+      roughness: 0.10,
+      metalness: 0.98,
+    });
+  } else if (shape === 'diamond') {
+    bodyMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color('#f1f5f9'),
+      roughness: 0.02,
+      metalness: 0.08,
+      transmission: 0.94,
+      transparent: true,
+      opacity: 0.94,
+      ior: 1.65,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.02,
+      reflectivity: 0.95,
+    });
+  } else if (shape === 'box' && skin.id === 'box_carton') {
+    bodyMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#f8fafc'),
+      roughness: 0.35,
+      metalness: 0.05,
+    });
+  } else {
+    bodyMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(bodyColor),
+      roughness: skin.roughness ?? 0.05,
+      metalness: skin.metalness ?? 0.1,
+      transmission: skin.transmission ?? 0.78,
+      transparent: true,
+      opacity: 0.92,
+      ior: 1.51,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.04,
+      reflectivity: 0.88,
+      ...(skin.emissive ? { emissive: new THREE.Color(skin.emissive), emissiveIntensity: 0.5 } : {}),
+    });
+  }
+
+  // 3. LIQUID MATERIAL
+  const liquidMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(liquidColor),
+    roughness: 0.02,
+    metalness: 0.0,
+    transmission: 0.88,
+    transparent: true,
+    opacity: 0.84,
+    ior: 1.333,
+  });
+
+  // --- SHAPE VARIATIONS ---
+  if (shape === 'round') {
+    // ------------------------------------
+    // 1. ROUND SPHERICAL POTION ORB
+    // ------------------------------------
+    const orbPoints: THREE.Vector2[] = [];
+    const rBase = 0.076;
+    const rBulge = 0.116;
+    const rNeck = 0.034;
+
+    // Center indentation base
+    orbPoints.push(new THREE.Vector2(0.001, 0.004));
+    orbPoints.push(new THREE.Vector2(0.030, 0.008));
+    orbPoints.push(new THREE.Vector2(0.058, 0.000));
+    orbPoints.push(new THREE.Vector2(rBase, 0.015));
+
+    // Spherical expansion
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14;
+      const angle = -Math.PI / 2 + t * Math.PI; // -90 deg to +90 deg
+      const radiusAtT = rBase + (rBulge - rBase) * Math.cos(angle);
+      const yAtT = 0.02 + 0.16 + Math.sin(angle) * 0.15;
+      orbPoints.push(new THREE.Vector2(radiusAtT, yAtT));
+    }
+
+    // Elegant curving neck
+    orbPoints.push(new THREE.Vector2(rNeck * 1.35, 0.355));
+    orbPoints.push(new THREE.Vector2(rNeck, 0.385));
+    orbPoints.push(new THREE.Vector2(rNeck * 1.15, 0.410)); // Gold collar ring
+    orbPoints.push(new THREE.Vector2(rNeck, 0.420));
+    orbPoints.push(new THREE.Vector2(rNeck, 0.448));
+
+    const orbGeom = new THREE.LatheGeometry(orbPoints, 64);
+    orbGeom.translate(0, baseOffsetY, 0);
+    const bodyMesh = new THREE.Mesh(orbGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Rounded liquid inside
+    const liqPoints: THREE.Vector2[] = [];
+    liqPoints.push(new THREE.Vector2(0.001, 0.006));
+    liqPoints.push(new THREE.Vector2(0.056, 0.008));
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      const angle = -Math.PI / 2 + t * (Math.PI * 0.48);
+      const r = (rBase + (rBulge - rBase) * Math.cos(angle)) * 0.94;
+      const y = 0.02 + 0.16 + Math.sin(angle) * 0.145;
+      liqPoints.push(new THREE.Vector2(r, y));
+    }
+    liqPoints.push(new THREE.Vector2(0.001, 0.165));
+    const liqGeom = new THREE.LatheGeometry(liqPoints, 48);
+    liqGeom.translate(0, baseOffsetY, 0);
+    const liqMesh = new THREE.Mesh(liqGeom, liquidMat);
+    bottleGroup.add(liqMesh);
+
+    // Golden Rune Collar Ring
+    const ringGeom = new THREE.TorusGeometry(rNeck * 1.12, 0.008, 16, 48);
+    ringGeom.rotateX(Math.PI / 2);
+    ringGeom.translate(0, baseOffsetY + 0.395, 0);
+    const goldMat = new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.85, roughness: 0.2 });
+    const collar = new THREE.Mesh(ringGeom, goldMat);
+    bottleGroup.add(collar);
+
+    // Circular center seal emblem
+    const sealGeom = new THREE.CylinderGeometry(0.045, 0.045, 0.004, 32);
+    sealGeom.rotateX(Math.PI / 2);
+    sealGeom.translate(0, baseOffsetY + 0.17, rBulge * 0.98);
+    const sealMat = new THREE.MeshStandardMaterial({ color: capColor, metalness: 0.4, roughness: 0.3 });
+    bottleGroup.add(new THREE.Mesh(sealGeom, sealMat));
+
+    // Cap
+    const capGeom = new THREE.CylinderGeometry(0.038, 0.038, 0.038, 48);
+    capGeom.translate(0, baseOffsetY + 0.45, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+  } else if (shape === 'box') {
+    // ------------------------------------
+    // 2. BOX CARTON / CYBER CUBE BOTTLE
+    // ------------------------------------
+    const boxW = 0.155;
+    const boxD = 0.155;
+    const boxH = 0.32;
+    const rNeck = 0.035;
+
+    // Rounded rectangle shape for box extrusion
+    const shapeBox = new THREE.Shape();
+    const cr = 0.024;
+    const bx = -boxW / 2;
+    const bz = -boxD / 2;
+    shapeBox.moveTo(bx + cr, bz);
+    shapeBox.lineTo(bx + boxW - cr, bz);
+    shapeBox.quadraticCurveTo(bx + boxW, bz, bx + boxW, bz + cr);
+    shapeBox.lineTo(bx + boxW, bz + boxD - cr);
+    shapeBox.quadraticCurveTo(bx + boxW, bz + boxD, bx + boxW - cr, bz + boxD);
+    shapeBox.lineTo(bx + cr, bz + boxD);
+    shapeBox.quadraticCurveTo(bx, bz + boxD, bx, bz + boxD - cr);
+    shapeBox.lineTo(bx, bz + cr);
+    shapeBox.quadraticCurveTo(bx, bz, bx + cr, bz);
+
+    const extrudeSettings = {
+      depth: boxH,
+      bevelEnabled: true,
+      bevelSegments: 4,
+      steps: 1,
+      bevelSize: 0.008,
+      bevelThickness: 0.008,
+    };
+    const boxGeom = new THREE.ExtrudeGeometry(shapeBox, extrudeSettings);
+    boxGeom.rotateX(Math.PI / 2);
+    boxGeom.translate(0, baseOffsetY + boxH + 0.008, 0);
+
+    const bodyMesh = new THREE.Mesh(boxGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Liquid block inside
+    if (skin.id !== 'box_carton') {
+      const liqBoxGeom = new THREE.BoxGeometry(boxW * 0.90, 0.14, boxD * 0.90);
+      liqBoxGeom.translate(0, baseOffsetY + 0.075, 0);
+      const liqMesh = new THREE.Mesh(liqBoxGeom, liquidMat);
+      bottleGroup.add(liqMesh);
+    }
+
+    // Threaded neck mount on top of box
+    const neckGeom = new THREE.CylinderGeometry(rNeck * 1.05, rNeck * 1.35, 0.08, 32);
+    neckGeom.translate(0, baseOffsetY + boxH + 0.045, 0);
+    const neckMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.2, metalness: 0.1 });
+    bottleGroup.add(new THREE.Mesh(neckGeom, neckMat));
+
+    // Brand Label Front Plate
+    const frontLabelGeom = new THREE.PlaneGeometry(boxW * 0.88, boxH * 0.58);
+    const frontLabelTex = getBottleLabelTexture(capColor, labelText);
+    const labelMat = new THREE.MeshStandardMaterial({ map: frontLabelTex, roughness: 0.2, side: THREE.DoubleSide });
+    const frontLabel = new THREE.Mesh(frontLabelGeom, labelMat);
+    frontLabel.position.set(0, baseOffsetY + boxH * 0.55, boxD * 0.5 + 0.009);
+    bottleGroup.add(frontLabel);
+
+    // Cap
+    const capGeom = new THREE.CylinderGeometry(0.040, 0.040, 0.038, 48);
+    capGeom.translate(0, baseOffsetY + boxH + 0.088, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+  } else if (shape === 'tall') {
+    // ------------------------------------
+    // 3. TALL SLENDER THERMOS / LOMBA FLASK
+    // ------------------------------------
+    const tallPoints: THREE.Vector2[] = [];
+    const rBase = 0.068;
+    const rNeck = 0.032;
+
+    tallPoints.push(new THREE.Vector2(0.001, 0.003));
+    tallPoints.push(new THREE.Vector2(0.045, 0.006));
+    tallPoints.push(new THREE.Vector2(rBase, 0.020));
+
+    // Tall slender body
+    tallPoints.push(new THREE.Vector2(rBase, 0.150));
+    tallPoints.push(new THREE.Vector2(rBase * 0.96, 0.240)); // subtle waist cinch
+    tallPoints.push(new THREE.Vector2(rBase, 0.330));
+    tallPoints.push(new THREE.Vector2(rBase * 0.98, 0.400));
+    tallPoints.push(new THREE.Vector2(rNeck * 1.35, 0.440));
+    tallPoints.push(new THREE.Vector2(rNeck, 0.455));
+    tallPoints.push(new THREE.Vector2(rNeck, 0.475));
+
+    const tallGeom = new THREE.LatheGeometry(tallPoints, 64);
+    tallGeom.translate(0, baseOffsetY, 0);
+    const bodyMesh = new THREE.Mesh(tallGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Tall liquid column
+    const liqPoints: THREE.Vector2[] = [];
+    liqPoints.push(new THREE.Vector2(0.001, 0.005));
+    liqPoints.push(new THREE.Vector2(rBase * 0.90, 0.010));
+    liqPoints.push(new THREE.Vector2(rBase * 0.90, 0.170));
+    liqPoints.push(new THREE.Vector2(0.001, 0.175));
+    const liqGeom = new THREE.LatheGeometry(liqPoints, 48);
+    liqGeom.translate(0, baseOffsetY, 0);
+    bottleGroup.add(new THREE.Mesh(liqGeom, liquidMat));
+
+    // Metallic sports grip bands
+    const trimGeom = new THREE.CylinderGeometry(rBase * 1.01, rBase * 1.01, 0.012, 48);
+    const trimMat = new THREE.MeshStandardMaterial({ color: capColor, metalness: 0.8, roughness: 0.2 });
+    [0.18, 0.38].forEach((ty) => {
+      const trim = new THREE.Mesh(trimGeom, trimMat);
+      trim.position.set(0, baseOffsetY + ty, 0);
+      bottleGroup.add(trim);
+    });
+
+    // Label band
+    const labelGeom = new THREE.CylinderGeometry(rBase * 1.005, rBase * 1.005, 0.09, 64, 1, true);
+    labelGeom.translate(0, baseOffsetY + 0.28, 0);
+    const labelTex = getBottleLabelTexture(capColor, labelText);
+    const labelMat = new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.2, side: THREE.DoubleSide });
+    bottleGroup.add(new THREE.Mesh(labelGeom, labelMat));
+
+    // Cap
+    const capGeom = new THREE.CylinderGeometry(0.035, 0.035, 0.038, 48);
+    capGeom.translate(0, baseOffsetY + 0.48, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+  } else if (shape === 'short') {
+    // ------------------------------------
+    // 4. SHORT CHUBBY MINI POCKET BOTTLE
+    // ------------------------------------
+    const shortPoints: THREE.Vector2[] = [];
+    const rBase = 0.096;
+    const rNeck = 0.045;
+
+    shortPoints.push(new THREE.Vector2(0.001, 0.004));
+    shortPoints.push(new THREE.Vector2(0.055, 0.008));
+    shortPoints.push(new THREE.Vector2(rBase, 0.022));
+
+    // Chubby stout body
+    shortPoints.push(new THREE.Vector2(rBase, 0.160));
+    shortPoints.push(new THREE.Vector2(rBase * 0.94, 0.220));
+    shortPoints.push(new THREE.Vector2(rNeck * 1.35, 0.270));
+    shortPoints.push(new THREE.Vector2(rNeck, 0.300));
+    shortPoints.push(new THREE.Vector2(rNeck, 0.330));
+
+    const shortGeom = new THREE.LatheGeometry(shortPoints, 64);
+    shortGeom.translate(0, baseOffsetY, 0);
+    const bodyMesh = new THREE.Mesh(shortGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Chubby liquid inside
+    const liqPoints: THREE.Vector2[] = [];
+    liqPoints.push(new THREE.Vector2(0.001, 0.006));
+    liqPoints.push(new THREE.Vector2(rBase * 0.92, 0.010));
+    liqPoints.push(new THREE.Vector2(rBase * 0.92, 0.130));
+    liqPoints.push(new THREE.Vector2(0.001, 0.135));
+    const liqGeom = new THREE.LatheGeometry(liqPoints, 48);
+    liqGeom.translate(0, baseOffsetY, 0);
+    bottleGroup.add(new THREE.Mesh(liqGeom, liquidMat));
+
+    // Wide chunky label
+    const labelGeom = new THREE.CylinderGeometry(rBase * 1.005, rBase * 1.005, 0.08, 64, 1, true);
+    labelGeom.translate(0, baseOffsetY + 0.11, 0);
+    const labelTex = getBottleLabelTexture(capColor, labelText);
+    const labelMat = new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.2, side: THREE.DoubleSide });
+    bottleGroup.add(new THREE.Mesh(labelGeom, labelMat));
+
+    // Chunky wide cap
+    const capGeom = new THREE.CylinderGeometry(0.048, 0.048, 0.038, 48);
+    capGeom.translate(0, baseOffsetY + 0.34, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+  } else if (shape === 'diamond') {
+    // ------------------------------------
+    // 5. FACETED PRISMATIC CRYSTAL DECANTER
+    // ------------------------------------
+    const rBase = 0.088;
+    const rNeck = 0.035;
+
+    // 8-sided faceted octagonal decanter
+    const diaGeom = new THREE.CylinderGeometry(rBase * 0.92, rBase, 0.34, 8, 3);
+    diaGeom.translate(0, baseOffsetY + 0.17, 0);
+    const bodyMesh = new THREE.Mesh(diaGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Octagonal liquid inside
+    const liqGeom = new THREE.CylinderGeometry(rBase * 0.85, rBase * 0.88, 0.14, 8);
+    liqGeom.translate(0, baseOffsetY + 0.08, 0);
+    bottleGroup.add(new THREE.Mesh(liqGeom, liquidMat));
+
+    // Neck ring
+    const neckGeom = new THREE.CylinderGeometry(rNeck, rNeck * 1.35, 0.08, 16);
+    neckGeom.translate(0, baseOffsetY + 0.38, 0);
+    bottleGroup.add(new THREE.Mesh(neckGeom, bodyMat));
+
+    // Jewel Cap
+    const capGeom = new THREE.CylinderGeometry(0.042, 0.042, 0.042, 8);
+    capGeom.translate(0, baseOffsetY + 0.44, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+  } else if (shape === 'soda') {
+    // ------------------------------------
+    // 6. HOURGLASS SODA BOTTLE
+    // ------------------------------------
+    const sodaPoints: THREE.Vector2[] = [];
+    const rBase = 0.084;
+    const rNeck = 0.034;
+
+    sodaPoints.push(new THREE.Vector2(0.001, 0.004));
+    sodaPoints.push(new THREE.Vector2(0.048, 0.000));
+    sodaPoints.push(new THREE.Vector2(rBase, 0.024));
+    sodaPoints.push(new THREE.Vector2(rBase * 0.96, 0.090));
+    sodaPoints.push(new THREE.Vector2(0.068, 0.160)); // Waist cinch
+    sodaPoints.push(new THREE.Vector2(0.083, 0.260)); // Upper chest
+    sodaPoints.push(new THREE.Vector2(0.076, 0.330));
+    sodaPoints.push(new THREE.Vector2(rNeck * 1.35, 0.390));
+    sodaPoints.push(new THREE.Vector2(rNeck, 0.420));
+    sodaPoints.push(new THREE.Vector2(rNeck, 0.448));
+
+    const sodaGeom = new THREE.LatheGeometry(sodaPoints, 64);
+    sodaGeom.translate(0, baseOffsetY, 0);
+    const bodyMesh = new THREE.Mesh(sodaGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Soda liquid
+    const liqPoints: THREE.Vector2[] = [];
+    liqPoints.push(new THREE.Vector2(0.001, 0.006));
+    liqPoints.push(new THREE.Vector2(rBase * 0.90, 0.010));
+    liqPoints.push(new THREE.Vector2(0.065, 0.150));
+    liqPoints.push(new THREE.Vector2(0.001, 0.155));
+    const liqGeom = new THREE.LatheGeometry(liqPoints, 48);
+    liqGeom.translate(0, baseOffsetY, 0);
+    bottleGroup.add(new THREE.Mesh(liqGeom, liquidMat));
+
+    // Label band in upper chest
+    const labelGeom = new THREE.CylinderGeometry(0.081, 0.081, 0.075, 64, 1, true);
+    labelGeom.translate(0, baseOffsetY + 0.25, 0);
+    const labelTex = getBottleLabelTexture(capColor, labelText);
+    const labelMat = new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.18, side: THREE.DoubleSide });
+    bottleGroup.add(new THREE.Mesh(labelGeom, labelMat));
+
+    // Cap
+    const capGeom = new THREE.CylinderGeometry(0.038, 0.038, 0.038, 48);
+    capGeom.translate(0, baseOffsetY + 0.455, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+  } else {
+    // ------------------------------------
+    // 7. CLASSIC RIBBED PET BOTTLE / SPORT / GOLD / GALAXY
+    // ------------------------------------
+    const points: THREE.Vector2[] = [];
+    const rBase = 0.084;
+    const rRibOut = 0.085;
+    const rRibIn = 0.078;
+    const rNeck = 0.035;
+
+    points.push(new THREE.Vector2(0.001, 0.004));
+    points.push(new THREE.Vector2(0.024, 0.012));
+    points.push(new THREE.Vector2(0.058, 0.000));
+    points.push(new THREE.Vector2(rBase * 0.94, 0.003));
+    points.push(new THREE.Vector2(rBase, 0.022));
+
+    points.push(new THREE.Vector2(rBase, 0.095));
+    points.push(new THREE.Vector2(rRibIn, 0.110));
+    points.push(new THREE.Vector2(rRibOut, 0.125));
+    points.push(new THREE.Vector2(rRibIn, 0.140));
+    points.push(new THREE.Vector2(rRibOut, 0.155));
+    points.push(new THREE.Vector2(rRibIn, 0.170));
+    points.push(new THREE.Vector2(rRibOut, 0.185));
+
+    points.push(new THREE.Vector2(rBase, 0.195));
+    points.push(new THREE.Vector2(rBase, 0.285));
+
+    points.push(new THREE.Vector2(rRibIn, 0.298));
+    points.push(new THREE.Vector2(rRibOut, 0.312));
+
+    points.push(new THREE.Vector2(rBase * 0.96, 0.340));
+    points.push(new THREE.Vector2(rBase * 0.72, 0.380));
+    points.push(new THREE.Vector2(rNeck * 1.35, 0.412));
+    points.push(new THREE.Vector2(rNeck, 0.428));
+    points.push(new THREE.Vector2(rNeck * 1.08, 0.438));
+    points.push(new THREE.Vector2(rNeck, 0.444));
+    points.push(new THREE.Vector2(rNeck, 0.458));
+
+    const latheGeom = new THREE.LatheGeometry(points, 64);
+    latheGeom.translate(0, baseOffsetY, 0);
+    const bodyMesh = new THREE.Mesh(latheGeom, bodyMat);
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    bottleGroup.add(bodyMesh);
+
+    // Liquid
+    const waterPoints: THREE.Vector2[] = [];
+    waterPoints.push(new THREE.Vector2(0.001, 0.006));
+    waterPoints.push(new THREE.Vector2(rBase * 0.92, 0.008));
+    waterPoints.push(new THREE.Vector2(rBase * 0.94, 0.136));
+    waterPoints.push(new THREE.Vector2(rBase * 0.86, 0.144));
+    waterPoints.push(new THREE.Vector2(0.001, 0.144));
+
+    const waterGeom = new THREE.LatheGeometry(waterPoints, 48);
+    waterGeom.translate(0, baseOffsetY, 0);
+    const waterMesh = new THREE.Mesh(waterGeom, liquidMat);
+    bottleGroup.add(waterMesh);
+
+    // Wrap label
+    const labelGeom = new THREE.CylinderGeometry(0.083, 0.083, 0.088, 64, 1, true);
+    labelGeom.translate(0, baseOffsetY + 0.24, 0);
+    const labelTex = getBottleLabelTexture(capColor, labelText);
+    const labelMat = new THREE.MeshStandardMaterial({
+      map: labelTex,
+      roughness: 0.18,
+      metalness: 0.06,
+      side: THREE.DoubleSide,
+    });
+    bottleGroup.add(new THREE.Mesh(labelGeom, labelMat));
+
+    // Cap & seal
+    const capGeom = new THREE.CylinderGeometry(0.038, 0.038, 0.038, 48);
+    capGeom.translate(0, baseOffsetY + 0.46, 0);
+    const capMesh = new THREE.Mesh(capGeom, capMat);
+    capMesh.castShadow = true;
+    bottleGroup.add(capMesh);
+
+    const sealGeom = new THREE.TorusGeometry(0.037, 0.004, 16, 48);
+    sealGeom.rotateX(Math.PI / 2);
+    sealGeom.translate(0, baseOffsetY + 0.438, 0);
+    bottleGroup.add(new THREE.Mesh(sealGeom, capMat));
+  }
+
+  return bottleGroup;
+}
+
 export function createSafeWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   // CRITICAL: Prevent default on webglcontextlost so browser doesn't block the origin
   canvas.addEventListener(
@@ -1106,10 +1636,10 @@ export class SceneBuilder {
     this.scene.add(coasterGroup);
   }
 
-  // High Fidelity Clear Water Bottle with Horizontal Ribs
+  // High Fidelity 3D Bottle Generator with diverse physical shapes (Round, Box, Tall, Short, Soda, Diamond, etc.)
   public createBottleMesh(
     skinId = 'classic',
-    capId = 'capBlue',
+    capId = 'capRed',
     overrides?: {
       bodyTint?: string;
       capColor?: string;
@@ -1117,147 +1647,7 @@ export class SceneBuilder {
       labelText?: string;
     }
   ): THREE.Group {
-    const bottleGroup = new THREE.Group();
-
-    const skin: SkinItem =
-      SKINS_BOTTLES.find((s) => s.id === skinId) || SKINS_BOTTLES[0];
-    const cap: SkinItem =
-      SKINS_CAPS.find((c) => c.id === capId) || SKINS_CAPS[0];
-
-    const baseOffsetY = -0.14;
-    const bodyColor = overrides?.bodyTint || (skinId === 'neon' ? '#22c55e' : '#e0f2fe');
-    const capColor = overrides?.capColor || cap.color;
-    const liquidColor = overrides?.liquidColor || (skinId === 'gold' ? '#fbbf24' : '#38bdf8');
-    const labelText = overrides?.labelText || (capId === 'capRed' ? 'P2 FLIP' : 'P1 FLIP');
-
-    // Lathe profile with authentic petaloid base, grip indentations, and threaded neck
-    const points: THREE.Vector2[] = [];
-    const rBase = 0.084;
-    const rRibOut = 0.085;
-    const rRibIn = 0.078;
-    const rNeck = 0.035;
-
-    // Petaloid champagne base (center dimple gives authentic water bottle bottom)
-    points.push(new THREE.Vector2(0.001, 0.004));
-    points.push(new THREE.Vector2(0.024, 0.012)); // Center dome pushed in
-    points.push(new THREE.Vector2(0.058, 0.000)); // Standing contact ring feet
-    points.push(new THREE.Vector2(rBase * 0.94, 0.003));
-    points.push(new THREE.Vector2(rBase, 0.022)); // Base perimeter rim
-
-    // Lower cylinder section
-    points.push(new THREE.Vector2(rBase, 0.095));
-
-    // Grip Rib 1 (double beveled for realistic plastic refraction)
-    points.push(new THREE.Vector2(rRibIn, 0.110));
-    points.push(new THREE.Vector2(rRibOut, 0.125));
-
-    // Grip Rib 2
-    points.push(new THREE.Vector2(rRibIn, 0.140));
-    points.push(new THREE.Vector2(rRibOut, 0.155));
-
-    // Grip Rib 3
-    points.push(new THREE.Vector2(rRibIn, 0.170));
-    points.push(new THREE.Vector2(rRibOut, 0.185));
-
-    // Label band area (smooth cylindrical belt for the brand label)
-    points.push(new THREE.Vector2(rBase, 0.195));
-    points.push(new THREE.Vector2(rBase, 0.285));
-
-    // Grip Rib 4 (upper waist)
-    points.push(new THREE.Vector2(rRibIn, 0.298));
-    points.push(new THREE.Vector2(rRibOut, 0.312));
-
-    // Ergonomic shoulder curvature
-    points.push(new THREE.Vector2(rBase * 0.96, 0.340));
-    points.push(new THREE.Vector2(rBase * 0.72, 0.380));
-    points.push(new THREE.Vector2(rNeck * 1.35, 0.412));
-    points.push(new THREE.Vector2(rNeck, 0.428));
-    points.push(new THREE.Vector2(rNeck * 1.08, 0.438)); // Neck collar ring
-    points.push(new THREE.Vector2(rNeck, 0.444));
-    points.push(new THREE.Vector2(rNeck, 0.458)); // Threaded neck top
-
-    const latheGeom = new THREE.LatheGeometry(points, 64);
-    latheGeom.translate(0, baseOffsetY, 0);
-
-    // Crystal clear PET plastic with realistic highlights and clearcoat
-    const bottleMat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(bodyColor),
-      roughness: 0.04,
-      metalness: 0.0,
-      transmission: 0.92,
-      transparent: true,
-      opacity: 0.92,
-      ior: 1.51,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.03,
-      reflectivity: 0.88,
-    });
-
-    const bodyMesh = new THREE.Mesh(latheGeom, bottleMat);
-    bodyMesh.castShadow = true;
-    bodyMesh.receiveShadow = true;
-    bottleGroup.add(bodyMesh);
-
-    // Water liquid inside (1/3 full with authentic meniscus)
-    const waterPoints: THREE.Vector2[] = [];
-    waterPoints.push(new THREE.Vector2(0.001, 0.006));
-    waterPoints.push(new THREE.Vector2(rBase * 0.92, 0.008));
-    waterPoints.push(new THREE.Vector2(rBase * 0.94, 0.136));
-    waterPoints.push(new THREE.Vector2(rBase * 0.86, 0.144));
-    waterPoints.push(new THREE.Vector2(0.001, 0.144)); // Meniscus
-
-    const waterGeom = new THREE.LatheGeometry(waterPoints, 48);
-    waterGeom.translate(0, baseOffsetY, 0);
-
-    const waterMat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(liquidColor),
-      roughness: 0.02,
-      metalness: 0.0,
-      transmission: 0.90,
-      transparent: true,
-      opacity: 0.82,
-      ior: 1.333,
-    });
-    const waterMesh = new THREE.Mesh(waterGeom, waterMat);
-    bottleGroup.add(waterMesh);
-
-    // Cap with ribbed knurling bump texture and bevel
-    const capGeom = new THREE.CylinderGeometry(0.038, 0.038, 0.038, 48);
-    capGeom.translate(0, baseOffsetY + 0.46, 0);
-
-    const capMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(capColor),
-      roughness: 0.20,
-      metalness: 0.18,
-      bumpMap: getCapRibBumpTexture(),
-      bumpScale: 0.045,
-    });
-    const capMesh = new THREE.Mesh(capGeom, capMat);
-    capMesh.castShadow = true;
-    bottleGroup.add(capMesh);
-
-    // Tamper-evident seal ring
-    const sealGeom = new THREE.TorusGeometry(0.037, 0.004, 16, 48);
-    sealGeom.rotateX(Math.PI / 2);
-    sealGeom.translate(0, baseOffsetY + 0.438, 0);
-    const sealMesh = new THREE.Mesh(sealGeom, capMat);
-    bottleGroup.add(sealMesh);
-
-    // Wrap label: High Definition bottle brand band reacting to lighting
-    const labelGeom = new THREE.CylinderGeometry(0.083, 0.083, 0.088, 64, 1, true);
-    labelGeom.translate(0, baseOffsetY + 0.24, 0);
-
-    const labelTex = getBottleLabelTexture(capColor, labelText);
-    const labelMat = new THREE.MeshStandardMaterial({
-      map: labelTex,
-      roughness: 0.18,
-      metalness: 0.06,
-      side: THREE.DoubleSide,
-    });
-    const labelMesh = new THREE.Mesh(labelGeom, labelMat);
-    bottleGroup.add(labelMesh);
-
-    return bottleGroup;
+    return createStandaloneBottleMesh(skinId, capId, overrides);
   }
 
   // 3D Obstacle Models: TV, Fridge ("feez"), Mini Box, Microwave, Stool, Books, Speaker, Washer, Nightstand, Crate, Moving Deck, etc.

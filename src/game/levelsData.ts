@@ -16,10 +16,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 2,
     title: 'Close Delivery Parcel',
     description: 'Short drag angled slightly left! Pop the bottle onto the close parcel box.',
-    targetHeight: 0.28,
+    targetHeight: 0.25,
     targetDistance: 1.45,
-    targetRadius: 0.46,
-    targetX: -0.25,
+    targetRadius: 0.50,
+    targetX: -0.18,
     obstacleType: 'minibox',
     starsScoreRequirement: [1, 2, 4],
   },
@@ -27,10 +27,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 3,
     title: 'Study Book Stack',
     description: 'Gentle loft to the right! Stick the landing on the low study encyclopedia.',
-    targetHeight: 0.36,
+    targetHeight: 0.30,
     targetDistance: 1.55,
-    targetRadius: 0.45,
-    targetX: 0.25,
+    targetRadius: 0.48,
+    targetX: 0.18,
     obstacleType: 'books',
     starsScoreRequirement: [1, 2, 4],
   },
@@ -39,8 +39,8 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     title: 'Mid-Range Bullseye',
     description: 'Moderate swipe straight ahead onto the colorful precision coaster ring.',
     targetHeight: 0,
-    targetDistance: 1.85,
-    targetRadius: 0.65,
+    targetDistance: 1.80,
+    targetRadius: 0.68,
     targetX: 0,
     obstacleType: 'none',
     starsScoreRequirement: [1, 2, 4],
@@ -49,9 +49,9 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 5,
     title: 'Low Coffee Stool',
     description: 'Elevated landing on the wooden coffee stool. Controlled flick needed.',
-    targetHeight: 0.44,
+    targetHeight: 0.38,
     targetDistance: 1.70,
-    targetRadius: 0.48,
+    targetRadius: 0.50,
     targetX: -0.15,
     obstacleType: 'stool',
     starsScoreRequirement: [1, 2, 4],
@@ -60,10 +60,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 6,
     title: 'Bedside Nightstand',
     description: 'Angled flick to the right onto the polished wooden drawer nightstand.',
-    targetHeight: 0.50,
-    targetDistance: 2.05,
-    targetRadius: 0.46,
-    targetX: 0.30,
+    targetHeight: 0.45,
+    targetDistance: 2.00,
+    targetRadius: 0.48,
+    targetX: 0.22,
     obstacleType: 'nightstand',
     starsScoreRequirement: [1, 2, 5],
   },
@@ -71,9 +71,9 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 7,
     title: 'Kitchen Microwave Cart',
     description: 'Land squarely on the countertop microwave cart straight ahead.',
-    targetHeight: 0.52,
-    targetDistance: 2.20,
-    targetRadius: 0.48,
+    targetHeight: 0.46,
+    targetDistance: 2.10,
+    targetRadius: 0.50,
     targetX: 0,
     obstacleType: 'microwave',
     starsScoreRequirement: [1, 2, 5],
@@ -82,10 +82,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 8,
     title: 'Living Room TV Console',
     description: 'Solid flip onto the TV console! Bounce off the solid flatscreen if thrown too far.',
-    targetHeight: 0.56,
-    targetDistance: 2.40,
-    targetRadius: 0.52,
-    targetX: -0.20,
+    targetHeight: 0.52,
+    targetDistance: 2.25,
+    targetRadius: 0.54,
+    targetX: -0.15,
     obstacleType: 'tv',
     starsScoreRequirement: [1, 2, 5],
   },
@@ -93,23 +93,23 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 9,
     title: 'Close Hover Deck',
     description: 'Close range moving drone! Time your gentle release as the deck drifts.',
-    targetHeight: 0.38,
+    targetHeight: 0.36,
     targetDistance: 1.60,
-    targetRadius: 0.48,
+    targetRadius: 0.50,
     targetX: 0,
     obstacleType: 'moving',
-    movingSpeed: 0.9,
-    movingDistance: 0.50,
+    movingSpeed: 0.85,
+    movingDistance: 0.45,
     starsScoreRequirement: [1, 2, 5],
   },
   {
     id: 10,
     title: 'Laundry Washing Machine',
     description: 'Aim slightly to the left onto the flat top of the front-load washer.',
-    targetHeight: 0.60,
-    targetDistance: 2.30,
-    targetRadius: 0.46,
-    targetX: -0.28,
+    targetHeight: 0.54,
+    targetDistance: 2.25,
+    targetRadius: 0.48,
+    targetX: -0.20,
     obstacleType: 'washer',
     starsScoreRequirement: [1, 2, 5],
   },
@@ -117,10 +117,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 11,
     title: 'Studio Speaker Tower',
     description: 'Stick the narrow summit of the studio subwoofer tower on the right.',
-    targetHeight: 0.66,
-    targetDistance: 2.45,
-    targetRadius: 0.42,
-    targetX: 0.28,
+    targetHeight: 0.58,
+    targetDistance: 2.35,
+    targetRadius: 0.46,
+    targetX: 0.20,
     obstacleType: 'speaker',
     starsScoreRequirement: [1, 2, 5],
   },
@@ -128,9 +128,9 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 12,
     title: 'Kitchen Double-Door Fridge',
     description: 'High upward power arc! Reach the summit of the tall refrigerator.',
-    targetHeight: 0.88,
-    targetDistance: 2.65,
-    targetRadius: 0.48,
+    targetHeight: 0.72,
+    targetDistance: 2.50,
+    targetRadius: 0.52,
     targetX: 0,
     obstacleType: 'fridge',
     starsScoreRequirement: [1, 2, 5],
@@ -139,10 +139,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 13,
     title: 'Timber Shipping Crate',
     description: 'Longer swipe aimed leftward onto the rugged warehouse cargo crate.',
-    targetHeight: 0.54,
-    targetDistance: 2.75,
-    targetRadius: 0.46,
-    targetX: -0.32,
+    targetHeight: 0.50,
+    targetDistance: 2.65,
+    targetRadius: 0.48,
+    targetX: -0.22,
     obstacleType: 'crate',
     starsScoreRequirement: [1, 3, 6],
   },
@@ -150,9 +150,9 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 14,
     title: 'Tall Bar Stool',
     description: 'Deep distance and high elevation! Land on the round bar stool seat.',
-    targetHeight: 0.72,
-    targetDistance: 2.90,
-    targetRadius: 0.44,
+    targetHeight: 0.65,
+    targetDistance: 2.75,
+    targetRadius: 0.46,
     targetX: 0,
     obstacleType: 'stool',
     starsScoreRequirement: [1, 3, 6],
@@ -161,10 +161,10 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 15,
     title: 'Far Range TV Credenza',
     description: 'Deep throw to the right! Powerful swipe to reach the executive TV unit.',
-    targetHeight: 0.62,
-    targetDistance: 3.10,
-    targetRadius: 0.48,
-    targetX: 0.25,
+    targetHeight: 0.55,
+    targetDistance: 2.90,
+    targetRadius: 0.52,
+    targetX: 0.18,
     obstacleType: 'tv',
     starsScoreRequirement: [1, 3, 6],
   },
@@ -172,23 +172,23 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 16,
     title: 'High-Speed Speedway Deck',
     description: 'Fast moving gliding platform demands razor-sharp reflex timing at distance.',
-    targetHeight: 0.46,
-    targetDistance: 2.80,
-    targetRadius: 0.44,
+    targetHeight: 0.42,
+    targetDistance: 2.65,
+    targetRadius: 0.48,
     targetX: 0,
     obstacleType: 'moving',
-    movingSpeed: 1.5,
-    movingDistance: 0.75,
+    movingSpeed: 1.20,
+    movingDistance: 0.60,
     starsScoreRequirement: [1, 3, 6],
   },
   {
     id: 17,
     title: 'Deep Cargo Crate',
     description: 'Far range throw! Full power swipe required to reach the far timber crate.',
-    targetHeight: 0.68,
-    targetDistance: 3.25,
-    targetRadius: 0.45,
-    targetX: -0.25,
+    targetHeight: 0.60,
+    targetDistance: 3.00,
+    targetRadius: 0.48,
+    targetX: -0.18,
     obstacleType: 'crate',
     starsScoreRequirement: [1, 3, 6],
   },
@@ -196,21 +196,21 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
     id: 18,
     title: 'Breezy Patio Stool',
     description: 'Crosswind draft! Strong swipe compensating against the rightward breeze.',
-    targetHeight: 0.74,
-    targetDistance: 3.05,
-    targetRadius: 0.42,
-    targetX: 0.30,
+    targetHeight: 0.65,
+    targetDistance: 2.90,
+    targetRadius: 0.46,
+    targetX: 0.20,
     obstacleType: 'stool',
-    wind: 0.38,
+    wind: 0.28,
     starsScoreRequirement: [1, 3, 6],
   },
   {
     id: 19,
     title: 'Skyscraper Tall Fridge',
     description: 'Massive upward power lob! Stick the high summit of the tall freezer.',
-    targetHeight: 1.05,
-    targetDistance: 3.35,
-    targetRadius: 0.46,
+    targetHeight: 0.78,
+    targetDistance: 3.10,
+    targetRadius: 0.50,
     targetX: 0,
     obstacleType: 'fridge',
     starsScoreRequirement: [1, 3, 6],
@@ -218,13 +218,13 @@ export const HAND_AUTHORED_LEVELS: LevelConfig[] = [
   {
     id: 20,
     title: 'Grand Apex Summit',
-    description: 'The Ultimate Campaign Finale! Maximum distance, high summit, and crosswind.',
-    targetHeight: 0.95,
-    targetDistance: 3.55,
-    targetRadius: 0.38,
+    description: 'The Ultimate Campaign Finale! High summit platform with gentle breeze.',
+    targetHeight: 0.75,
+    targetDistance: 3.25,
+    targetRadius: 0.46,
     targetX: 0,
     obstacleType: 'stool',
-    wind: 0.42,
+    wind: 0.30,
     starsScoreRequirement: [2, 4, 7],
   },
 ];
@@ -264,43 +264,43 @@ export function getLevelConfig(levelNumber: number): LevelConfig {
   ];
   const obstacleType = obstacleChoices[Math.floor(rand() * obstacleChoices.length)];
 
-  // Varied Target Distance: cycles between close (1.4m - 1.7m), medium (1.8m - 2.5m), and far range (2.6m - 3.5m)
-  const distanceArchetypes = [1.45, 1.65, 1.95, 2.30, 2.70, 3.10, 3.45];
+  // Varied Target Distance: cycles between close (1.4m - 1.7m), medium (1.8m - 2.5m), and far range (2.6m - 3.3m)
+  const distanceArchetypes = [1.45, 1.65, 1.95, 2.30, 2.65, 2.95, 3.25];
   const archIndex = Math.floor(rand() * distanceArchetypes.length);
-  const baseDist = distanceArchetypes[archIndex] + progressRatio * 0.25;
-  const targetDistance = Math.min(3.6, Math.max(1.35, Math.round((baseDist + (rand() - 0.5) * 0.3) * 10) / 10));
+  const baseDist = distanceArchetypes[archIndex] + progressRatio * 0.20;
+  const targetDistance = Math.min(3.30, Math.max(1.35, Math.round((baseDist + (rand() - 0.5) * 0.25) * 10) / 10));
 
   // Varied Lateral Position (left, center, right)
-  const xArchetypes = [-0.32, -0.20, 0, 0, 0.20, 0.32];
+  const xArchetypes = [-0.25, -0.15, 0, 0, 0.15, 0.25];
   const targetX = xArchetypes[Math.floor(rand() * xArchetypes.length)];
 
   // Target Height: adjusted per obstacle type for realistic geometry
-  let baseHeight = 0.45;
+  let baseHeight = 0.42;
   if (obstacleType === 'fridge') {
-    baseHeight = 0.85 + progressRatio * 0.25;
+    baseHeight = 0.68 + progressRatio * 0.12;
   } else if (obstacleType === 'stool') {
-    baseHeight = 0.55 + progressRatio * 0.35;
+    baseHeight = 0.50 + progressRatio * 0.20;
   } else if (obstacleType === 'minibox') {
-    baseHeight = 0.28 + progressRatio * 0.15;
+    baseHeight = 0.26 + progressRatio * 0.10;
   } else if (obstacleType === 'speaker' || obstacleType === 'tv') {
-    baseHeight = 0.55 + progressRatio * 0.20;
+    baseHeight = 0.50 + progressRatio * 0.12;
   } else {
-    baseHeight = 0.40 + progressRatio * 0.25;
+    baseHeight = 0.38 + progressRatio * 0.18;
   }
-  const targetHeight = Math.min(1.10, Math.round((baseHeight + rand() * 0.15) * 100) / 100);
+  const targetHeight = Math.min(0.80, Math.round((baseHeight + rand() * 0.10) * 100) / 100);
 
   // Target Radius
-  const targetRadius = Math.max(0.34, Math.round((0.50 - progressRatio * 0.14 + (rand() - 0.5) * 0.06) * 100) / 100);
+  const targetRadius = Math.max(0.44, Math.round((0.52 - progressRatio * 0.08 + (rand() - 0.5) * 0.04) * 100) / 100);
 
   // Crosswind
   const hasWind = rand() > 0.65;
-  const windStrength = hasWind ? (rand() > 0.5 ? 1 : -1) * (0.20 + progressRatio * 0.40) : 0;
+  const windStrength = hasWind ? (rand() > 0.5 ? 1 : -1) * (0.15 + progressRatio * 0.20) : 0;
   const wind = Math.round(windStrength * 100) / 100;
 
   // Moving Platform dynamics
   const isMoving = obstacleType === 'moving';
-  const movingSpeed = isMoving ? Math.round((0.85 + progressRatio * 0.85 + rand() * 0.4) * 10) / 10 : undefined;
-  const movingDistance = isMoving ? Math.round((0.45 + progressRatio * 0.25 + rand() * 0.2) * 10) / 10 : undefined;
+  const movingSpeed = isMoving ? Math.round((0.80 + progressRatio * 0.50 + rand() * 0.3) * 10) / 10 : undefined;
+  const movingDistance = isMoving ? Math.round((0.40 + progressRatio * 0.20 + rand() * 0.15) * 10) / 10 : undefined;
 
   const objectDisplayNames: Record<ObstacleType, string> = {
     none: 'Table Coaster',

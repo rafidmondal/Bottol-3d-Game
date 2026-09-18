@@ -108,15 +108,10 @@ export default function App() {
       return;
     }
 
-    // Create Home 3D Bottles: P1 (blue/equipped) on left, P2 (red) on right
+    // Create Home 3D Bottles: P1 (equipped skin & cap) on left, P2 (red) on right
     try {
       const skins = getSkinsState();
-      const p1Bottle = sb.createBottleMesh(skins.equippedBottle, skins.equippedCap, {
-        bodyTint: '#e0f2fe',
-        capColor: '#2563eb',
-        liquidColor: '#0284c7',
-        labelText: 'P1 FLIP',
-      });
+      const p1Bottle = sb.createBottleMesh(skins.equippedBottle, skins.equippedCap);
       p1Bottle.position.set(-0.56, 0.14, 1.05);
       sb.scene.add(p1Bottle);
       homeBottleP1Ref.current = p1Bottle;
@@ -190,7 +185,7 @@ export default function App() {
     if (homeSceneBuilderRef.current && homeBottleP1Ref.current) {
       homeSceneBuilderRef.current.scene.remove(homeBottleP1Ref.current);
       const newMesh = homeSceneBuilderRef.current.createBottleMesh(bottleId, capId);
-      newMesh.position.set(-0.42, 0.23, 0.8);
+      newMesh.position.set(-0.56, 0.14, 1.05);
       homeSceneBuilderRef.current.scene.add(newMesh);
       homeBottleP1Ref.current = newMesh;
     }

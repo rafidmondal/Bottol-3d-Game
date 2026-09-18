@@ -223,13 +223,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // Apply sensitivity
     physicsRef.current.sensitivityMultiplier = 0.6 + (sensitivity / 100) * 0.8;
 
-    // Build player 1 active bottle (Glacier Blue & Royal Blue Cap)
-    const p1Bottle = sb.createBottleMesh(equippedBottle, equippedCap, {
-      bodyTint: '#e0f2fe',
-      capColor: '#2563eb',
-      liquidColor: '#0284c7',
-      labelText: 'P1 FLIP',
-    });
+    // Build player 1 active bottle using user's equipped bottle and cap
+    const p1Bottle = sb.createBottleMesh(equippedBottle, equippedCap);
     p1Bottle.position.set(0, physicsRef.current.centerOfMassY, 0);
     sb.scene.add(p1Bottle);
     p1BottleMeshRef.current = p1Bottle;
@@ -248,8 +243,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       p2BottleMeshRef.current = p2Bottle;
     }
 
-    // Dynamic celebration particle buffer with soft glowing texture
-    const maxParticles = 180;
+    // Dynamic particle buffer with soft glowing additive texture
+    const maxParticles = 320;
     const particleGeom = new THREE.BufferGeometry();
     const posArray = new Float32Array(maxParticles * 3);
     const colorArray = new Float32Array(maxParticles * 3);
@@ -274,7 +269,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const particleTexture = new THREE.CanvasTexture(particleCanvas);
 
     const particleMat = new THREE.PointsMaterial({
-      size: 0.07,
+      size: 0.12,
       map: particleTexture,
       vertexColors: true,
       transparent: true,
@@ -376,21 +371,70 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           const posAttr = particlesMeshRef.current.geometry.getAttribute('position') as THREE.BufferAttribute;
           const colAttr = particlesMeshRef.current.geometry.getAttribute('color') as THREE.BufferAttribute;
 
-          // Emit flight trail spark when in air
-          if (physics.state.isInFlight && Math.random() > 0.5 && pool.length < 80) {
-            const trailCol = skins.equippedTrail === 'trailFire' ? 0xf97316 : 0x38bdf8;
-            pool.push({
-              position: new THREE.Vector3(
-                physics.state.position.x + (Math.random() - 0.5) * 0.04,
-                physics.state.position.y - 0.06,
-                physics.state.position.z + (Math.random() - 0.5) * 0.04
-              ),
-              velocity: new THREE.Vector3((Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.15, -0.3),
-              color: new THREE.Color(trailCol),
-              size: 0.025,
-              life: 0.38,
-              maxLife: 0.38,
-            });
+          // Emit flight trail sparks when in air
+          if (physics.state.isInFlight && pool.length < 280) {
+            const currentTrail = getSkinsState().equippedTrail || equippedTrail;
+            const now = performance.now();
+
+            // Emit from both top (cap) and bottom of the rotating bottle
+            for (let e = 0; e < 2; e++) {
+              const yOffset = e === 0 ? -0.1 : 0.1;
+              const localOffset = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.02,
+                yOffset,
+                (Math.random() - 0.5) * 0.02
+              );
+              localOffset.applyQuaternion(physics.state.quaternion);
+              const spawnPos = physics.state.position.clone().add(localOffset);
+
+              let color = new THREE.Color(0x38bdf8);
+              let life = 0.5;
+              let extraVel = new THREE.Vector3(0, 0, 0);
+
+              if (currentTrail === 'trailSparkle') {
+                const colors = [0xfde047, 0xfacc15, 0xffffff, 0xfef08a];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.55;
+                extraVel.set((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2);
+              } else if (currentTrail === 'trailFire') {
+                const colors = [0xef4444, 0xf97316, 0xea580c, 0xfbbf24];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.48;
+                extraVel.set((Math.random() - 0.5) * 0.15, 0.45 + Math.random() * 0.25, (Math.random() - 0.5) * 0.15);
+              } else if (currentTrail === 'trailRainbow') {
+                const hue = (now * 0.0018 + e * 0.35 + Math.random() * 0.08) % 1;
+                color = new THREE.Color().setHSL(hue, 1.0, 0.6);
+                life = 0.6;
+                extraVel.set((Math.random() - 0.5) * 0.15, 0.08, (Math.random() - 0.5) * 0.15);
+              } else if (currentTrail === 'trailCyan') {
+                const colors = [0x22d3ee, 0x06b6d4, 0x67e8f9, 0xffffff];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.44;
+                extraVel.set((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3);
+              } else if (currentTrail === 'trailSakura') {
+                const colors = [0xf472b6, 0xfb7185, 0xfda4af, 0xffe4e6];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.65;
+                extraVel.set((Math.random() - 0.5) * 0.18, -0.04, (Math.random() - 0.5) * 0.18);
+              } else if (currentTrail === 'trailEmerald') {
+                const colors = [0x10b981, 0x34d399, 0x6ee7b7, 0x059669];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.52;
+                extraVel.set((Math.random() - 0.5) * 0.2, 0.12, (Math.random() - 0.5) * 0.2);
+              }
+
+              // Oppose bottle movement vector for stream trail
+              const backwardVel = physics.state.velocity.clone().multiplyScalar(-0.12);
+
+              pool.push({
+                position: spawnPos,
+                velocity: backwardVel.add(extraVel),
+                color,
+                size: 0.045,
+                life,
+                maxLife: life,
+              });
+            }
           }
 
           let writeIdx = 0;
@@ -402,7 +446,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               continue;
             }
 
-            p.velocity.y -= 9.81 * 0.35 * dt; // mild gravity for particles
+            p.velocity.y -= 9.81 * 0.2 * dt; // mild gravity for particles
             p.position.addScaledVector(p.velocity, dt);
 
             if (writeIdx < maxParticles) {
@@ -527,7 +571,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       triggerCelebrationParticles(physicsRef.current.state.position, isPerfect || isEdge);
     }
 
-    recordFlip(isSuccess, isPerfect, isEdge);
+    recordFlip(isSuccess, isPerfect, isEdge, res.flipsCompleted || 1);
 
     if (isSuccess) {
       addCoins(isPerfect ? 10 : 5);

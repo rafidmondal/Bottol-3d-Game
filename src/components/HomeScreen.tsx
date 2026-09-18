@@ -3,6 +3,7 @@ import { Gamepad2, Trophy, Shirt, Star, Sparkles, User, Infinity, BookOpen } fro
 import { Screen } from '../types';
 import { audio } from '../services/audio';
 import { isEndlessUnlocked, getMaxUnlockedLevel } from '../services/storage';
+import { getUnclaimedDailyMissionsCount } from '../services/dailyMissions';
 import { BottleFlipLogo } from './BottleFlipLogo';
 import { PolicyButton, PolicyModal } from './PolicyModal';
 
@@ -14,6 +15,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [showPolicies, setShowPolicies] = useState(false);
   const endlessUnlocked = isEndlessUnlocked();
   const maxUnlocked = getMaxUnlockedLevel();
+  const unclaimedMissions = getUnclaimedDailyMissionsCount();
   return (
     <div className="relative w-full h-full flex flex-col justify-between p-2 sm:p-5 pointer-events-none select-none overflow-y-auto overflow-x-hidden">
       {/* 1. TOP LOGO SECTION */}
@@ -217,10 +219,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               audio.playButton();
               onNavigate('ACHIEVEMENTS');
             }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-3 rounded-xl sm:rounded-full hover:bg-slate-800 text-slate-200 hover:text-white text-[10px] sm:text-xs font-black active:scale-95 transition-all font-['Fredoka']"
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-3 rounded-xl sm:rounded-full hover:bg-slate-800 text-slate-200 hover:text-white text-[10px] sm:text-xs font-black active:scale-95 transition-all font-['Fredoka']"
           >
             <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 shrink-0" />
             <span className="truncate">BADGES</span>
+            {unclaimedMissions > 0 && (
+              <span className="absolute -top-1 -right-0.5 sm:top-0 sm:right-1 w-4 h-4 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-[9px] flex items-center justify-center animate-bounce shadow-md">
+                {unclaimedMissions}
+              </span>
+            )}
           </button>
 
           {/* PRACTICE */}

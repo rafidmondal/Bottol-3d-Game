@@ -117,47 +117,47 @@ export class BottlePhysics {
 
     // Accurate geometric dimensions matching sceneBuilder 3D meshes:
     if (type === 'tv') {
-      halfW = 0.675; // TV console cabinet 1.35m wide
-      halfD = 0.36;  // 0.72m deep
+      halfW = 0.70; // TV console cabinet 1.35m wide
+      halfD = 0.40; // 0.72m deep with landing buffer
       rad = 0.65;
     } else if (type === 'fridge') {
-      halfW = 0.48;
-      halfD = 0.46;
-      rad = 0.50;
+      halfW = 0.52;
+      halfD = 0.50;
+      rad = 0.52;
     } else if (type === 'minibox') {
-      halfW = 0.36;
-      halfD = 0.36;
-      rad = 0.42;
+      halfW = 0.40;
+      halfD = 0.40;
+      rad = 0.46;
     } else if (type === 'microwave') {
-      halfW = 0.42;
-      halfD = 0.34;
-      rad = 0.45;
+      halfW = 0.45;
+      halfD = 0.38;
+      rad = 0.48;
     } else if (type === 'stool') {
-      rad = config.targetRadius || 0.46;
+      rad = Math.max(config.targetRadius || 0.48, 0.46);
       halfW = rad;
       halfD = rad;
     } else if (type === 'books') {
-      halfW = 0.32;
-      halfD = 0.32;
-      rad = 0.40;
-    } else if (type === 'speaker') {
-      halfW = 0.26;
-      halfD = 0.26;
-      rad = 0.36;
-    } else if (type === 'washer') {
-      halfW = 0.39;
-      halfD = 0.39;
-      rad = 0.45;
-    } else if (type === 'nightstand') {
       halfW = 0.36;
-      halfD = 0.34;
-      rad = 0.42;
-    } else if (type === 'crate') {
-      halfW = 0.425;
-      halfD = 0.425;
+      halfD = 0.36;
+      rad = 0.44;
+    } else if (type === 'speaker') {
+      halfW = 0.30;
+      halfD = 0.30;
+      rad = 0.40;
+    } else if (type === 'washer') {
+      halfW = 0.42;
+      halfD = 0.42;
       rad = 0.48;
-    } else if (type === 'moving') {
+    } else if (type === 'nightstand') {
+      halfW = 0.40;
+      halfD = 0.38;
       rad = 0.46;
+    } else if (type === 'crate') {
+      halfW = 0.46;
+      halfD = 0.46;
+      rad = 0.50;
+    } else if (type === 'moving') {
+      rad = 0.48;
       halfW = rad;
       halfD = rad;
     }
@@ -188,31 +188,64 @@ export class BottlePhysics {
     const flickSpeed = effectiveDy / duration; // Typically 0.2 to 2.4 px/ms
 
     // Swipe power combines drag distance and release flick speed
-    // Smooth responsive scaling allows gentle "alpo drag" for close obstacles (1.3m - 1.6m)
-    // up to powerful deep swipes for far range obstacles (2.8m - 3.6m)
-    const swipePower = (effectiveDy * 0.0075 + flickSpeed * 0.65) * this.sensitivityMultiplier;
-    const clampedPower = Math.min(Math.max(swipePower, 0.26), 2.5);
+    const swipePower = (effectiveDy * 0.0078 + flickSpeed * 0.68) * this.sensitivityMultiplier;
+    const clampedPower = Math.min(Math.max(swipePower, 0.28), 2.6);
 
-    // Forward impulse:
-    // Light flick (clampedPower ~0.3): ~0.71 -> travels ~1.3m - 1.6m ("kono ta kase alpo drag")
-    // Medium flick (clampedPower ~1.0): ~1.40 -> travels ~2.0m - 2.4m
-    // Full power flick (clampedPower ~2.3): ~2.67 -> travels ~3.0m - 3.6m ("dure rang")
-    const forwardImpulse = 0.42 + clampedPower * 0.98;
+    // Target spatial parameters if obstacle exists
+    const targetDist = this.obstacle ? this.targetCenter.z : 2.0;
+    const targetH = this.obstacle && this.obstacle.topY !== undefined ? Math.max(0, this.obstacle.topY) : 0;
+    const targetX = this.obstacle ? this.targetCenter.x : 0;
 
-    // Upward launch impulse: weak swipe = small gentle hop (~3.8 m/s), high flick = ~8.2 m/s
-    const upwardImpulse = 3.2 + clampedPower * 2.5;
+    // 1. Forward impulse:
+    // Smooth responsive scaling from close range (1.35m) to far range (3.5m)
+    const baseForward = 0.52 + clampedPower * 1.12;
+    const distScale = 1.0 + Math.max(0, (targetDist - 1.8) * 0.14);
+    const forwardImpulse = baseForward * distScale;
 
-    // Lateral impulse and roll from crooked or tilted swipe
-    const sideImpulse = Math.min(Math.max((dragDx / duration) * 0.70, -2.0), 2.0) * this.sensitivityMultiplier;
-    const rollSpin = Math.min(Math.max((-dragDx / duration) * 0.40, -2.5), 2.5) * this.sensitivityMultiplier;
+    // 2. Upward launch impulse with elevation compensation:
+    // For elevated obstacles (TV, Fridge, Box, Stool), provides needed arc height
+    // so bottle comfortably reaches and descends onto the top surface ("Box, tv upore jasse e na" fix)
+    const elevationLift = targetH > 0 ? (Math.sqrt(2 * 9.2 * targetH) * 0.88 + targetH * 0.65) : 0;
+    const upwardImpulse = 3.3 + clampedPower * 2.4 + elevationLift;
 
-    // Pitch spin rate (rad/s) directly harmonized with flight arc duration:
-    // Sweet spot achieves clean 360 rotation over flight duration
-    const spinRate = (1.65 + clampedPower * 2.25) * (1.0 + (Math.random() - 0.5) * 0.03);
+    // 3. Lateral impulse with soft deadzone & aim guidance ("bottol motion onno jaye" fix):
+    // Accidental finger wobble under 14px has zero side impulse (pure straight flip)
+    let sideImpulse = 0;
+    const deadzone = 14;
+    if (Math.abs(dragDx) > deadzone) {
+      const netDx = Math.sign(dragDx) * (Math.abs(dragDx) - deadzone);
+      const rawSideSpeed = (netDx / duration) * 0.50 * this.sensitivityMultiplier;
+      sideImpulse = Math.min(Math.max(rawSideSpeed, -1.8), 1.8);
+    }
+
+    // In obstacle/level mode, if the target has an offset (targetX) and user swipes in that direction:
+    if (this.obstacle && Math.abs(targetX) > 0.05) {
+      const targetAimAngle = Math.atan2(targetX, targetDist);
+      const userSwipeAngle = Math.atan2(dragDx, effectiveDy);
+      if (Math.sign(userSwipeAngle) === Math.sign(targetAimAngle) || Math.abs(dragDx) < deadzone) {
+        const assistAmount = Math.abs(dragDx) < deadzone ? 0.35 : 0.55;
+        const desiredVx = (targetX / targetDist) * forwardImpulse;
+        sideImpulse = THREE.MathUtils.lerp(sideImpulse, desiredVx, assistAmount);
+      }
+    }
+
+    // Controlled roll spin (subtle, prevents erratic sideways tilting)
+    const rollSpin = Math.min(Math.max((-dragDx / duration) * 0.18, -1.2), 1.2) * this.sensitivityMultiplier;
+
+    // 4. Spin Rate Harmonization:
+    // Synchronize rotation with flight time to target platform for clean upright landing
+    const estFlightTime = Math.max(0.7, targetDist / (forwardImpulse || 1.4));
+    const targetFlips = clampedPower > 2.1 ? 2 : 1;
+    const synchronizedSpin = (targetFlips * 2 * Math.PI) / estFlightTime;
+    const spinRate = THREE.MathUtils.lerp(
+      1.8 + clampedPower * 2.2,
+      synchronizedSpin,
+      0.65
+    ) * (1.0 + (Math.random() - 0.5) * 0.02);
 
     return {
       velocity: new THREE.Vector3(sideImpulse, upwardImpulse, forwardImpulse),
-      angularVelocity: new THREE.Vector3(spinRate, (Math.random() - 0.5) * 0.03, rollSpin),
+      angularVelocity: new THREE.Vector3(spinRate, (Math.random() - 0.5) * 0.02, rollSpin),
       speed: clampedPower,
     };
   }
@@ -479,65 +512,67 @@ export class BottlePhysics {
     // 1. Check TV Flatscreen Barrier on top of TV Console
     if (obs.type === 'tv') {
       const tvScreenZ = obs.position.z + 0.22;
-      const tvScreenHalfW = 0.58;
+      const tvScreenHalfW = 0.56;
       const tvScreenHalfD = 0.05;
       const tvBottomY = obsTop;
-      const tvTopY = obsTop + 0.73;
+      const tvTopY = obsTop + 0.72;
 
       if (botLowest < tvTopY && botHighest > tvBottomY) {
         const dx = this.state.position.x - obs.position.x;
         const dz = this.state.position.z - tvScreenZ;
-        const limitX = tvScreenHalfW + this.radiusBase;
-        const limitZ = tvScreenHalfD + this.radiusBase;
+        const limitX = tvScreenHalfW + this.radiusBase * 0.8;
+        const limitZ = tvScreenHalfD + this.radiusBase * 0.8;
 
         if (Math.abs(dx) <= limitX && Math.abs(dz) <= limitZ) {
-          // Struck TV screen glass! Solid bounce
+          // Soft backboard bounce: gently bounces back onto the TV console surface in front
           const signZ = Math.sign(dz) || -1;
-          this.state.position.z = tvScreenZ + signZ * (limitZ + 0.005);
+          this.state.position.z = tvScreenZ + signZ * (limitZ + 0.01);
           if (signZ * this.state.velocity.z < 0) {
-            this.state.velocity.z = -this.state.velocity.z * 0.55;
+            this.state.velocity.z = -this.state.velocity.z * 0.25;
           }
-          this.state.velocity.y = this.state.velocity.y * 0.4 - 0.25;
-          this.state.angularVelocity.x = -signZ * 3.5;
-          audio.playTableImpact(0.85);
+          this.state.velocity.x *= 0.6;
+          this.state.velocity.y = Math.max(0, this.state.velocity.y * 0.3);
+          this.state.angularVelocity.multiplyScalar(0.4);
+          audio.playTableImpact(0.65);
           return;
         }
       }
     }
 
     // 2. Check main obstacle body (front, sides, back)
-    // Only collide with sides if bottle lowest point is below the top surface
-    if (botLowest < obsTop - 0.02 && botHighest > obsBottom) {
+    // CRITICAL: Side wall collision ONLY applies if the bottle center is clearly below the obstacle top!
+    // If the bottle is arriving above the top surface, it lands on the platform, NOT deflected by sides!
+    if (botY < obsTop - 0.06 && botHighest > obsBottom) {
       if (obs.halfWidth && obs.halfDepth && obs.type !== 'stool') {
         // Box Obstacle (tv, fridge, minibox, microwave, books, speaker, washer, nightstand, crate)
         const dx = this.state.position.x - obs.position.x;
         const dz = this.state.position.z - obs.position.z;
-        const limitX = obs.halfWidth + this.radiusBase * 0.85;
-        const limitZ = obs.halfDepth + this.radiusBase * 0.85;
+        const limitX = obs.halfWidth + this.radiusBase * 0.8;
+        const limitZ = obs.halfDepth + this.radiusBase * 0.8;
         const overlapX = limitX - Math.abs(dx);
         const overlapZ = limitZ - Math.abs(dz);
 
         if (overlapX > 0 && overlapZ > 0) {
-          // Solid penetration detected! Resolve along shallowest penetration axis
+          // Solid penetration detected
           if (overlapZ < overlapX) {
             // Front or Back Face
             const signZ = Math.sign(dz) || -1;
-            this.state.position.z = obs.position.z + signZ * (limitZ + 0.005);
+            this.state.position.z = obs.position.z + signZ * (limitZ + 0.008);
             if (signZ * this.state.velocity.z < 0) {
-              this.state.velocity.z = -this.state.velocity.z * 0.52;
+              this.state.velocity.z = -this.state.velocity.z * 0.40;
             }
-            this.state.velocity.y = this.state.velocity.y * 0.4 - 0.35;
-            this.state.angularVelocity.x = -signZ * 3.6;
-            audio.playTableImpact(0.8);
+            this.state.velocity.y = this.state.velocity.y * 0.3 - 0.15;
+            this.state.angularVelocity.x = -signZ * 2.2;
+            audio.playTableImpact(0.75);
           } else {
             // Left or Right Face
             const signX = Math.sign(dx) || 1;
-            this.state.position.x = obs.position.x + signX * (limitX + 0.005);
+            this.state.position.x = obs.position.x + signX * (limitX + 0.008);
             if (signX * this.state.velocity.x < 0) {
-              this.state.velocity.x = -this.state.velocity.x * 0.52;
+              this.state.velocity.x = -this.state.velocity.x * 0.40;
             }
-            this.state.velocity.y = this.state.velocity.y * 0.4;
-            audio.playTableImpact(0.75);
+            this.state.velocity.y = this.state.velocity.y * 0.3;
+            audio.playTableImpact(0.70);
           }
         }
       } else {
@@ -546,21 +581,20 @@ export class BottlePhysics {
         const dx = this.state.position.x - obs.position.x;
         const dz = this.state.position.z - obs.position.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
-        const limitDist = rad + this.radiusBase * 0.85;
+        const limitDist = rad + this.radiusBase * 0.8;
 
         if (dist < limitDist) {
           const nx = dx / (dist || 1);
           const nz = dz / (dist || 1);
-          this.state.position.x = obs.position.x + nx * (limitDist + 0.005);
-          this.state.position.z = obs.position.z + nz * (limitDist + 0.005);
+          this.state.position.x = obs.position.x + nx * (limitDist + 0.008);
+          this.state.position.z = obs.position.z + nz * (limitDist + 0.008);
           const dot = this.state.velocity.x * nx + this.state.velocity.z * nz;
           if (dot < 0) {
-            this.state.velocity.x -= 1.45 * dot * nx;
-            this.state.velocity.z -= 1.45 * dot * nz;
+            this.state.velocity.x -= 1.25 * dot * nx;
+            this.state.velocity.z -= 1.25 * dot * nz;
           }
-          this.state.velocity.y = this.state.velocity.y * 0.4 - 0.35;
-          this.state.angularVelocity.x = -3.2;
-          audio.playTableImpact(0.8);
+          this.state.velocity.y = this.state.velocity.y * 0.3 - 0.15;
+          audio.playTableImpact(0.75);
         }
       }
     }
@@ -593,9 +627,9 @@ export class BottlePhysics {
       if (obs.halfWidth && obs.halfDepth && obs.type !== 'stool') {
         const dx = Math.abs(x - obs.position.x);
         const dz = Math.abs(z - obs.position.z);
-        // Landing bounds on top of the solid furniture
-        if (dx <= obs.halfWidth + 0.04 && dz <= obs.halfDepth + 0.04) {
-          if (this.state.position.y >= obsTop - 0.14) {
+        // Generous landing bounds on top of the solid furniture
+        if (dx <= obs.halfWidth + 0.08 && dz <= obs.halfDepth + 0.08) {
+          if (this.state.position.y >= obsTop - 0.25) {
             return obsTop;
           }
         }
@@ -603,8 +637,8 @@ export class BottlePhysics {
         const rad = obs.radius || 0.46;
         const dx = x - obs.position.x;
         const dz = z - obs.position.z;
-        if (dx * dx + dz * dz <= (rad + 0.04) * (rad + 0.04)) {
-          if (this.state.position.y >= obsTop - 0.14) {
+        if (dx * dx + dz * dz <= (rad + 0.08) * (rad + 0.08)) {
+          if (this.state.position.y >= obsTop - 0.25) {
             return obsTop;
           }
         }
@@ -888,9 +922,9 @@ export class BottlePhysics {
     }
 
     // Check elevated obstacle target: must land atop the platform if target is elevated
-    if (this.obstacle && this.obstacle.position.y > 0.08) {
-      const obsTop = this.obstacle.position.y + this.obstacle.size.y * 0.5;
-      if (surfaceY < obsTop - 0.05) {
+    if (this.obstacle && (this.obstacle.topY || 0) > 0.05) {
+      const obsTop = this.obstacle.topY !== undefined ? this.obstacle.topY : this.targetCenter.y;
+      if (surfaceY < obsTop - 0.08) {
         audio.playFail();
         return {
           outcome: 'FAIL_OFF_TABLE',
@@ -902,8 +936,8 @@ export class BottlePhysics {
       }
     }
 
-    // 3. Upright Landing Evaluation (Physical threshold <= 20.0 degrees)
-    if (tiltAngleDeg <= 20.0) {
+    // 3. Upright Landing Evaluation (Physical threshold <= 22.0 degrees)
+    if (tiltAngleDeg <= 22.0) {
       const dx = this.state.position.x - this.targetCenter.x;
       const dz = this.state.position.z - this.targetCenter.z;
       const distToTarget = Math.sqrt(dx * dx + dz * dz);

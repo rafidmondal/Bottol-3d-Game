@@ -9,6 +9,7 @@ import {
   OverallStats,
   DailyRewardState,
 } from '../types';
+import { updateDailyMissionProgress } from './dailyMissions';
 
 const STORAGE_KEYS = {
   PROFILE: 'bf3d_profile',
@@ -236,6 +237,9 @@ export function recordLevelSuccess(level: number, score: number, starsEarned: nu
     if (level >= 20) incrementAchievement('level20', 1);
     if (level >= 50) incrementAchievement('level50', 1);
 
+    // Daily mission progression
+    updateDailyMissionProgress('level_clear', 1);
+
     notifyListeners();
   } catch (e) {
     console.error(e);
@@ -300,7 +304,7 @@ export function getStats(): OverallStats {
   return DEFAULT_STATS;
 }
 
-export function recordFlip(isSuccessful: boolean, isPerfect: boolean, isEdge = false): void {
+export function recordFlip(isSuccessful: boolean, isPerfect: boolean, isEdge = false, rotations = 1): void {
   const stats = getStats();
   stats.totalFlips += 1;
   if (isPerfect) stats.perfects += 1;
@@ -310,6 +314,21 @@ export function recordFlip(isSuccessful: boolean, isPerfect: boolean, isEdge = f
     localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
   } catch (e) {
     console.error(e);
+  }
+
+  // Daily missions progression
+  updateDailyMissionProgress('total_throws', 1);
+  if (isSuccessful) {
+    updateDailyMissionProgress('flips', 1);
+    if (rotations >= 2) {
+      updateDailyMissionProgress('double', 1);
+    }
+  }
+  if (isPerfect) {
+    updateDailyMissionProgress('perfect', 1);
+  }
+  if (isEdge) {
+    updateDailyMissionProgress('edge', 1);
   }
 
   // Achievement triggers
@@ -358,6 +377,7 @@ export function saveMatch(match: Omit<MatchRecord, 'id' | 'date'>): MatchRecord 
     } else if (match.mode === 'ai') {
       if (match.winner === 'p1') {
         stats.winsAi += 1;
+        updateDailyMissionProgress('ai_win', 1);
         if (match.difficulty === 'hard') {
           incrementAchievement('beatHard', 1);
         }
@@ -393,6 +413,9 @@ export function savePracticeStats(update: Partial<PracticeStats>): void {
   };
   try {
     localStorage.setItem(STORAGE_KEYS.PRACTICE, JSON.stringify(next));
+    if (update.timeBest || update.targetBest) {
+      updateDailyMissionProgress('practice_score', Math.max(update.timeBest ?? 0, update.targetBest ?? 0));
+    }
     notifyListeners();
   } catch (e) {
     console.error(e);
