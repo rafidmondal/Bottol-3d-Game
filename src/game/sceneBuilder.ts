@@ -1053,7 +1053,10 @@ export function createStandaloneBottleMesh(
   return bottleGroup;
 }
 
-export function createSafeWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
+export function createSafeWebGLRenderer(
+  canvas: HTMLCanvasElement,
+  customOptions?: { alpha?: boolean; antialias?: boolean; powerPreference?: 'default' | 'high-performance' | 'low-power' }
+): THREE.WebGLRenderer {
   // CRITICAL: Prevent default on webglcontextlost so browser doesn't block the origin
   canvas.addEventListener(
     'webglcontextlost',
@@ -1064,24 +1067,16 @@ export function createSafeWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLR
     false
   );
 
-  // Attempt to restore context if it was previously marked lost
-  try {
-    const existingGl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (existingGl && 'isContextLost' in existingGl && (existingGl as WebGLRenderingContext).isContextLost()) {
-      const loseExt = (existingGl as WebGLRenderingContext).getExtension('WEBGL_lose_context');
-      if (loseExt && typeof (loseExt as any).restoreContext === 'function') {
-        (loseExt as any).restoreContext();
-      }
-    }
-  } catch (_) {}
+  const reqAlpha = customOptions?.alpha ?? false;
+  const reqAntialias = customOptions?.antialias ?? true;
 
   const configs: THREE.WebGLRendererParameters[] = [
     {
       canvas,
-      antialias: true,
-      powerPreference: 'default',
+      antialias: reqAntialias,
+      powerPreference: customOptions?.powerPreference || 'default',
       failIfMajorPerformanceCaveat: false,
-      alpha: false,
+      alpha: reqAlpha,
     },
     {
       canvas,
@@ -1089,7 +1084,7 @@ export function createSafeWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLR
       powerPreference: 'default',
       precision: 'mediump',
       failIfMajorPerformanceCaveat: false,
-      alpha: false,
+      alpha: reqAlpha,
     },
     {
       canvas,
@@ -1097,7 +1092,7 @@ export function createSafeWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLR
       powerPreference: 'low-power',
       precision: 'lowp',
       failIfMajorPerformanceCaveat: false,
-      alpha: false,
+      alpha: reqAlpha,
     },
   ];
 

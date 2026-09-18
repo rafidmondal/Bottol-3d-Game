@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { ArrowLeft, Coins, Star, Check, Lock, Sparkles, Eye, RotateCw } from 'lucide-react';
+import { ArrowLeft, Coins, Star, Check, Lock, Sparkles, Eye, RotateCw, Tv } from 'lucide-react';
 import { SkinItem, BottleShape } from '../types';
 import { SKINS_BOTTLES, SKINS_CAPS, SKINS_TRAILS } from '../data/skinsData';
 import {
@@ -11,7 +11,8 @@ import {
   saveSkinsState,
 } from '../services/storage';
 import { audio } from '../services/audio';
-import { createStandaloneBottleMesh } from '../game/sceneBuilder';
+import { createStandaloneBottleMesh, createSafeWebGLRenderer } from '../game/sceneBuilder';
+import { triggerDirectAd } from '../services/adService';
 
 interface SkinsModalProps {
   onBack: () => void;
@@ -31,6 +32,7 @@ interface ShowcaseProps {
   isOwned: boolean;
   isLocked: boolean;
   cost: number;
+  unlockType?: 'coins' | 'ad';
   onEquip: () => void;
   onBuy: () => void;
 }
@@ -45,6 +47,7 @@ const BottleShowcaseStage: React.FC<ShowcaseProps> = ({
   isOwned,
   isLocked,
   cost,
+  unlockType,
   onEquip,
   onBuy,
 }) => {
@@ -54,39 +57,56 @@ const BottleShowcaseStage: React.FC<ShowcaseProps> = ({
   const rotYRef = useRef(0);
   const autoRotateRef = useRef(true);
 
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const contentGroupRef = useRef<THREE.Group | null>(null);
+  const animIdRef = useRef<number | null>(null);
+
+  const activeTrailIdRef = useRef<string | undefined>(trailId);
+  const activeAuraGroupRef = useRef<THREE.Group | null>(null);
+  const activeInnerAuraMeshRef = useRef<THREE.Mesh | null>(null);
+  const activeOuterAuraMeshRef = useRef<THREE.Mesh | null>(null);
+  const activeAuraLightRef = useRef<THREE.PointLight | null>(null);
+
+  const [hasWebglError, setHasWebglError] = useState(false);
+
+  // 1. Initialize WebGL Renderer & Scene ONCE for the canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let renderer: THREE.WebGLRenderer | null = null;
-    let animId: number;
-
+    let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({
-        canvas,
+      renderer = createSafeWebGLRenderer(canvas, {
         alpha: true,
         antialias: true,
-        powerPreference: 'high-performance',
+        powerPreference: 'default',
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(canvas.clientWidth || 300, canvas.clientHeight || 200, false);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.15;
+      rendererRef.current = renderer;
     } catch (e) {
-      console.warn('Failed to init 3D showcase WebGL renderer:', e);
+      console.warn('[Showcase] WebGL context creation failed, using 2D fallback:', e);
+      setHasWebglError(true);
       return;
     }
 
     const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
     const camera = new THREE.PerspectiveCamera(
       38,
-      canvas.clientWidth / canvas.clientHeight,
+      (canvas.clientWidth || 300) / (canvas.clientHeight || 200),
       0.1,
       20
     );
     camera.position.set(0, 0.14, 0.82);
     camera.lookAt(0, 0.08, 0);
+    cameraRef.current = camera;
 
     // Studio Lighting
     const ambLight = new THREE.AmbientLight(0xffffff, 1.4);
@@ -104,22 +124,151 @@ const BottleShowcaseStage: React.FC<ShowcaseProps> = ({
     rimLight.position.set(0, 2, -2);
     scene.add(rimLight);
 
-    // Bottom soft reflector light
     const floorFill = new THREE.DirectionalLight(0xffffff, 0.6);
     floorFill.position.set(0, -2, 1);
     scene.add(floorFill);
 
+    // Root Group for showcase contents
+    const contentGroup = new THREE.Group();
+    scene.add(contentGroup);
+    contentGroupRef.current = contentGroup;
+
+    // Interactive Drag Controls
+    const handlePointerDown = (e: PointerEvent) => {
+      isDraggingRef.current = true;
+      lastXRef.current = e.clientX;
+      autoRotateRef.current = false;
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const deltaX = e.clientX - lastXRef.current;
+      lastXRef.current = e.clientX;
+      rotYRef.current += deltaX * 0.015;
+    };
+
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+      setTimeout(() => {
+        if (!isDraggingRef.current) autoRotateRef.current = true;
+      }, 1500);
+    };
+
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    const handleResize = () => {
+      if (!canvas || !rendererRef.current || !cameraRef.current) return;
+      const w = canvas.clientWidth || 300;
+      const h = canvas.clientHeight || 200;
+      cameraRef.current.aspect = w / h;
+      cameraRef.current.updateProjectionMatrix();
+      rendererRef.current.setSize(w, h, false);
+    };
+    window.addEventListener('resize', handleResize);
+
+    const animate = () => {
+      animIdRef.current = requestAnimationFrame(animate);
+
+      if (autoRotateRef.current) {
+        rotYRef.current += 0.012;
+      }
+
+      if (contentGroupRef.current) {
+        contentGroupRef.current.rotation.y = rotYRef.current;
+      }
+
+      // Dynamic Aura Pulse & Rainbow Cycle
+      if (activeAuraGroupRef.current) {
+        const time = performance.now() * 0.001;
+        const pulse = Math.sin(time * 3.5) * 0.06;
+        activeInnerAuraMeshRef.current?.scale.set(1 + pulse, 1 + pulse * 0.5, 1 + pulse);
+        activeOuterAuraMeshRef.current?.scale.set(1 + pulse * 1.5, 1 + pulse * 0.8, 1 + pulse * 1.5);
+
+        if (activeTrailIdRef.current === 'trailRainbow') {
+          const hue = (time * 0.25) % 1;
+          const rainbowColor = new THREE.Color().setHSL(hue, 1, 0.6);
+          (activeInnerAuraMeshRef.current?.material as THREE.MeshBasicMaterial)?.color.copy(rainbowColor);
+          (activeOuterAuraMeshRef.current?.material as THREE.MeshBasicMaterial)?.color.setHSL((hue + 0.2) % 1, 0.9, 0.6);
+          if (activeAuraLightRef.current) activeAuraLightRef.current.color.copy(rainbowColor);
+        }
+      }
+
+      try {
+        renderer.render(scene, camera);
+      } catch (renderErr) {
+        console.warn('[Showcase] Frame render error:', renderErr);
+      }
+    };
+    animate();
+
+    return () => {
+      if (animIdRef.current) cancelAnimationFrame(animIdRef.current);
+      canvas.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('resize', handleResize);
+
+      try {
+        scene.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry?.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m) => m.dispose());
+            } else if (child.material) {
+              child.material.dispose();
+            }
+          }
+        });
+        renderer.dispose();
+      } catch (_) {}
+
+      rendererRef.current = null;
+      sceneRef.current = null;
+      contentGroupRef.current = null;
+    };
+  }, []);
+
+  // 2. Rebuild 3D Model contents inside contentGroup when skin/cap/trail changes
+  useEffect(() => {
+    const contentGroup = contentGroupRef.current;
+    if (!contentGroup) return;
+
+    // Clean up previous children in contentGroup
+    while (contentGroup.children.length > 0) {
+      const child = contentGroup.children[0];
+      contentGroup.remove(child);
+      child.traverse((c) => {
+        if (c instanceof THREE.Mesh) {
+          c.geometry?.dispose();
+          if (Array.isArray(c.material)) {
+            c.material.forEach((m) => m.dispose());
+          } else if (c.material) {
+            c.material.dispose();
+          }
+        } else if (c instanceof THREE.Points) {
+          c.geometry?.dispose();
+          (c.material as THREE.Material)?.dispose();
+        }
+      });
+    }
+
+    activeAuraGroupRef.current = null;
+    activeInnerAuraMeshRef.current = null;
+    activeOuterAuraMeshRef.current = null;
+    activeAuraLightRef.current = null;
+    activeTrailIdRef.current = trailId;
+
     // Build the 3D Bottle mesh
-    let bottleMesh: THREE.Group | null = null;
     try {
-      bottleMesh = createStandaloneBottleMesh(bottleId, capId);
-      scene.add(bottleMesh);
+      const bottleMesh = createStandaloneBottleMesh(bottleId, capId);
+      contentGroup.add(bottleMesh);
     } catch (err) {
-      console.warn('Error creating bottle mesh for showcase:', err);
+      console.warn('[Showcase] Error creating bottle mesh:', err);
     }
 
     // Dynamic Trail Particles Ribbon Preview
-    let trailPoints: THREE.Points | null = null;
     if (trailId) {
       const pCount = 72;
       const pGeom = new THREE.BufferGeometry();
@@ -149,6 +298,12 @@ const BottleShowcaseStage: React.FC<ShowcaseProps> = ({
           col = new THREE.Color(i % 2 === 0 ? 0xf472b6 : 0xfda4af);
         } else if (trailId === 'trailEmerald') {
           col = new THREE.Color(i % 2 === 0 ? 0x10b981 : 0x34d399);
+        } else if (trailId === 'trailDragonFlame') {
+          col = new THREE.Color(i % 2 === 0 ? 0xea580c : 0xfbbf24);
+        } else if (trailId === 'trailCosmicVoid') {
+          col = new THREE.Color(i % 2 === 0 ? 0xa855f7 : 0x38bdf8);
+        } else if (trailId === 'trailHyperGold') {
+          col = new THREE.Color(i % 2 === 0 ? 0xfacc15 : 0xffffff);
         }
 
         pCol[i * 3] = col.r;
@@ -182,100 +337,78 @@ const BottleShowcaseStage: React.FC<ShowcaseProps> = ({
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
-      trailPoints = new THREE.Points(pGeom, pMat);
-      scene.add(trailPoints);
+      const trailPoints = new THREE.Points(pGeom, pMat);
+      contentGroup.add(trailPoints);
+
+      // Dynamic Trail Glowing Aura Halo Mesh and Point Light
+      const auraColors: Record<string, { primary: number; secondary: number; lightColor: number }> = {
+        trailSparkle: { primary: 0xfde047, secondary: 0xfef08a, lightColor: 0xfde047 },
+        trailFire: { primary: 0xf97316, secondary: 0xef4444, lightColor: 0xff5722 },
+        trailRainbow: { primary: 0xa855f7, secondary: 0x06b6d4, lightColor: 0xec4899 },
+        trailCyan: { primary: 0x06b6d4, secondary: 0x38bdf8, lightColor: 0x00e5ff },
+        trailSakura: { primary: 0xf472b6, secondary: 0xfda4af, lightColor: 0xff69b4 },
+        trailEmerald: { primary: 0x10b981, secondary: 0x34d399, lightColor: 0x00e676 },
+        trailDragonFlame: { primary: 0xea580c, secondary: 0xfacc15, lightColor: 0xff3d00 },
+        trailCosmicVoid: { primary: 0xa855f7, secondary: 0x38bdf8, lightColor: 0x7c4dff },
+        trailHyperGold: { primary: 0xfacc15, secondary: 0xfffbeb, lightColor: 0xffd700 },
+      };
+
+      const aCol = auraColors[trailId] || { primary: 0x38bdf8, secondary: 0x0284c7, lightColor: 0x38bdf8 };
+      const auraGroup = new THREE.Group();
+
+      const innerGeom = new THREE.CylinderGeometry(0.085, 0.1, 0.36, 24, 1, true);
+      const innerMat = new THREE.MeshBasicMaterial({
+        color: aCol.primary,
+        transparent: true,
+        opacity: 0.52,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const auraInnerMesh = new THREE.Mesh(innerGeom, innerMat);
+      auraGroup.add(auraInnerMesh);
+
+      const outerGeom = new THREE.SphereGeometry(0.18, 16, 16);
+      outerGeom.scale(1, 1.35, 1);
+      const outerMat = new THREE.MeshBasicMaterial({
+        color: aCol.secondary,
+        transparent: true,
+        opacity: 0.28,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        depthWrite: false,
+      });
+      const auraOuterMesh = new THREE.Mesh(outerGeom, outerMat);
+      auraGroup.add(auraOuterMesh);
+
+      const auraLight = new THREE.PointLight(aCol.lightColor, 2.5, 2.5);
+      auraGroup.add(auraLight);
+
+      contentGroup.add(auraGroup);
+
+      activeAuraGroupRef.current = auraGroup;
+      activeInnerAuraMeshRef.current = auraInnerMesh;
+      activeOuterAuraMeshRef.current = auraOuterMesh;
+      activeAuraLightRef.current = auraLight;
     }
-
-    // Interactive Drag Controls
-    const handlePointerDown = (e: PointerEvent) => {
-      isDraggingRef.current = true;
-      lastXRef.current = e.clientX;
-      autoRotateRef.current = false;
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDraggingRef.current) return;
-      const deltaX = e.clientX - lastXRef.current;
-      lastXRef.current = e.clientX;
-      rotYRef.current += deltaX * 0.015;
-    };
-
-    const handlePointerUp = () => {
-      isDraggingRef.current = false;
-      // Resume gentle auto rotate after 1.5 seconds of inactivity
-      setTimeout(() => {
-        if (!isDraggingRef.current) autoRotateRef.current = true;
-      }, 1500);
-    };
-
-    canvas.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-
-    const handleResize = () => {
-      if (!canvas || !renderer) return;
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
-    };
-    window.addEventListener('resize', handleResize);
-
-    const animate = () => {
-      animId = requestAnimationFrame(animate);
-
-      if (autoRotateRef.current) {
-        rotYRef.current += 0.012;
-      }
-
-      if (bottleMesh) {
-        bottleMesh.rotation.y = rotYRef.current;
-      }
-
-      if (trailPoints) {
-        trailPoints.rotation.y += 0.025;
-      }
-
-      renderer?.render(scene, camera);
-    };
-    animate();
-
-    return () => {
-      cancelAnimationFrame(animId);
-      canvas.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('resize', handleResize);
-
-      // Clean up Three.js objects
-      if (bottleMesh) {
-        bottleMesh.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.geometry?.dispose();
-            if (Array.isArray(child.material)) {
-              child.material.forEach((m) => m.dispose());
-            } else if (child.material) {
-              child.material.dispose();
-            }
-          }
-        });
-      }
-      if (trailPoints) {
-        trailPoints.geometry.dispose();
-        (trailPoints.material as THREE.Material).dispose();
-      }
-      renderer?.dispose();
-    };
   }, [bottleId, capId, trailId]);
 
   return (
     <div className="relative w-full h-44 sm:h-52 rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950/95 border border-slate-700/60 shadow-xl overflow-hidden mb-3 flex flex-col justify-between p-3 select-none">
-      {/* 3D WebGL Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"
-      />
+      {/* 3D WebGL Canvas or 2D Safe Fallback */}
+      {!hasWebglError ? (
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"
+        />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-slate-950/80">
+          <div className="w-16 h-28 rounded-xl bg-gradient-to-b from-blue-400/30 to-blue-600/40 border-2 border-blue-400/60 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+          </div>
+          <span className="text-xs text-slate-400 font-bold mt-2">Interactive Preview</span>
+        </div>
+      )}
 
       {/* Top Bar Info */}
       <div className="relative z-10 flex items-center justify-between pointer-events-none">
@@ -320,11 +453,22 @@ const BottleShowcaseStage: React.FC<ShowcaseProps> = ({
               className={`px-4 py-1.5 rounded-xl text-xs font-black shadow-lg flex items-center gap-1.5 active:scale-95 transition-all ${
                 isLocked
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : unlockType === 'ad'
+                  ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-slate-950 shadow-amber-500/30 border border-amber-300'
                   : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 text-white shadow-amber-500/20'
               }`}
             >
-              <Coins className="w-3.5 h-3.5" />
-              <span>BUY FOR {cost}</span>
+              {unlockType === 'ad' ? (
+                <>
+                  <Tv className="w-3.5 h-3.5 text-slate-950" />
+                  <span>ADS BUY (WATCH AD)</span>
+                </>
+              ) : (
+                <>
+                  <Coins className="w-3.5 h-3.5" />
+                  <span>BUY FOR {cost}</span>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -387,26 +531,43 @@ const BottleCardThumbnail: React.FC<BottleThumbnailProps> = ({
     return (
       <svg viewBox="0 0 100 100" className="w-16 h-16 drop-shadow-md">
         <defs>
-          <radialGradient id={`glow-${color}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={color} stopOpacity="0.9" />
-            <stop offset="60%" stopColor={color} stopOpacity="0.3" />
+          <radialGradient id={`auraGlow-${color}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.95" />
+            <stop offset="50%" stopColor={color} stopOpacity="0.5" />
+            <stop offset="80%" stopColor={color} stopOpacity="0.15" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </radialGradient>
         </defs>
-        {/* Swirling particle tail stream */}
-        <circle cx="50" cy="50" r="38" fill={`url(#glow-${color})`} />
+        {/* Radiating Aura Light Background */}
+        <circle cx="50" cy="50" r="44" fill={`url(#auraGlow-${color})`} />
+
+        {/* Pulsing Aura Energy Rings */}
+        <ellipse cx="50" cy="52" rx="28" ry="36" fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1.5" strokeOpacity="0.8" strokeDasharray="4 2" />
+        <ellipse cx="50" cy="52" rx="20" ry="28" fill="none" stroke="#ffffff" strokeWidth="1.2" strokeOpacity="0.9" />
+
+        {/* Bottle Silhouette in Center of Aura */}
         <path
-          d="M 20 75 Q 35 30 75 25 Q 50 65 20 75 Z"
-          fill={color}
-          fillOpacity="0.75"
+          d="M 42 78 L 42 48 C 42 42 46 38 48 34 L 52 34 C 54 38 58 42 58 48 L 58 78 Z"
+          fill="#0f172a"
+          stroke={color}
+          strokeWidth="1.8"
         />
-        <circle cx="75" cy="25" r="7" fill="#ffffff" />
-        <circle cx="62" cy="40" r="4.5" fill="#fef08a" />
-        <circle cx="45" cy="58" r="3.5" fill={color} />
-        <circle cx="30" cy="70" r="2.5" fill="#ffffff" />
-        {/* Star bursts */}
-        <path d="M 75 16 L 77 23 L 84 25 L 77 27 L 75 34 L 73 27 L 66 25 L 73 23 Z" fill="#ffffff" />
-        <path d="M 38 32 L 40 36 L 44 37 L 40 38 L 38 42 L 36 38 L 32 37 L 36 36 Z" fill="#ffffff" fillOpacity="0.8" />
+        {/* Cap */}
+        <rect x="47" y="28" width="6" height="6" rx="1" fill={color} stroke="#ffffff" strokeWidth="0.8" />
+
+        {/* Glowing Aura Beam Flares */}
+        <line x1="50" y1="8" x2="50" y2="24" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="50" y1="80" x2="50" y2="94" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="16" y1="52" x2="30" y2="52" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="70" y1="52" x2="84" y2="52" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+
+        {/* Aura Sparkles */}
+        <circle cx="28" cy="34" r="2.5" fill="#ffffff" />
+        <circle cx="72" cy="38" r="3" fill="#fef08a" />
+        <circle cx="68" cy="70" r="2.2" fill="#ffffff" />
+        <circle cx="32" cy="68" r="2" fill={color} />
+        {/* Star flash */}
+        <path d="M 50 16 L 52 21 L 57 23 L 52 25 L 50 30 L 48 25 L 43 23 L 48 21 Z" fill="#ffffff" />
       </svg>
     );
   }
@@ -651,6 +812,14 @@ export const SkinsModal: React.FC<SkinsModalProps> = ({ onBack, onSkinEquipped }
 
   const handleBuy = (item: SkinItem) => {
     audio.playButton();
+
+    // If item is unlocked via Ad (2-in-1: opens ad link and immediately unlocks & equips)
+    if (item.unlockType === 'ad') {
+      triggerDirectAd();
+      handleAdUnlockSuccess(item);
+      return;
+    }
+
     if (item.starsRequired > stars) {
       showToast(`Requires ${item.starsRequired} stars to unlock!`);
       return;
@@ -678,7 +847,25 @@ export const SkinsModal: React.FC<SkinsModalProps> = ({ onBack, onSkinEquipped }
       if (item.category === 'caps') setInspectedCapId(item.id);
       if (item.category === 'trails') setInspectedTrailId(item.id);
       onSkinEquipped?.(updated.equippedBottle, updated.equippedCap);
+      showToast(`Equipped ${item.name}!`);
     }
+  };
+
+  const handleAdUnlockSuccess = (item: SkinItem) => {
+    audio.playCoin();
+    const updatedOwned = [...skinsState.owned, item.id];
+    const updated = saveSkinsState({
+      owned: updatedOwned,
+      ...(item.category === 'bottles' ? { equippedBottle: item.id } : {}),
+      ...(item.category === 'caps' ? { equippedCap: item.id } : {}),
+      ...(item.category === 'trails' ? { equippedTrail: item.id } : {}),
+    });
+    setSkinsState(updated);
+    if (item.category === 'bottles') setInspectedBottleId(item.id);
+    if (item.category === 'caps') setInspectedCapId(item.id);
+    if (item.category === 'trails') setInspectedTrailId(item.id);
+    onSkinEquipped?.(updated.equippedBottle, updated.equippedCap);
+    showToast(`Unlocked & Equipped ${item.name}!`);
   };
 
   const handleEquip = (item: SkinItem) => {
@@ -770,6 +957,7 @@ export const SkinsModal: React.FC<SkinsModalProps> = ({ onBack, onSkinEquipped }
         isOwned={isInspectedOwned}
         isLocked={isInspectedLocked}
         cost={currentInspectedItem.cost}
+        unlockType={currentInspectedItem.unlockType}
         onEquip={() => handleEquip(currentInspectedItem)}
         onBuy={() => handleBuy(currentInspectedItem)}
       />
@@ -828,12 +1016,14 @@ export const SkinsModal: React.FC<SkinsModalProps> = ({ onBack, onSkinEquipped }
                 key={item.id}
                 id={`skin-card-${item.id}`}
                 onClick={() => handleCardClick(item)}
-                className={`relative flex flex-col justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all font-['Fredoka'] bg-slate-900/90 hover:bg-slate-850 ${
+                className={`relative flex flex-col justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all font-['Fredoka'] ${
                   isEquipped
                     ? 'border-blue-500 shadow-lg shadow-blue-500/25 bg-blue-950/20'
                     : isInspected
                     ? 'border-cyan-400/80 shadow-md shadow-cyan-400/20'
-                    : 'border-slate-800/90 hover:border-slate-700'
+                    : item.unlockType === 'ad'
+                    ? 'border-amber-500/60 bg-amber-950/20 shadow-md shadow-amber-500/10 hover:border-amber-400'
+                    : 'bg-slate-900/90 hover:bg-slate-850 border-slate-800/90 hover:border-slate-700'
                 }`}
               >
                 {/* Visual Thumbnail Preview Container */}
@@ -848,12 +1038,16 @@ export const SkinsModal: React.FC<SkinsModalProps> = ({ onBack, onSkinEquipped }
                     category={activeTab}
                   />
 
-                  {/* Shape Badge Tag */}
-                  {item.tag && (
+                  {/* Shape / Pinned Badge Tag */}
+                  {item.unlockType === 'ad' ? (
+                    <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[9px] font-black tracking-wider shadow-md flex items-center gap-0.5 border border-amber-300">
+                      <Sparkles className="w-2.5 h-2.5" /> PINNED
+                    </div>
+                  ) : item.tag ? (
                     <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-slate-900/80 text-cyan-300 text-[9px] font-black tracking-wider border border-slate-700">
                       {item.tag}
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Active / Equipped Badge */}
                   {isEquipped && (
@@ -910,11 +1104,22 @@ export const SkinsModal: React.FC<SkinsModalProps> = ({ onBack, onSkinEquipped }
                       className={`w-full py-1.5 rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
                         isStarLocked
                           ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          : item.unlockType === 'ad'
+                          ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-slate-950 border border-amber-300 font-extrabold shadow-amber-500/25'
                           : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 text-white'
                       }`}
                     >
-                      <Coins className="w-3.5 h-3.5" />
-                      <span>{item.cost}</span>
+                      {item.unlockType === 'ad' ? (
+                        <>
+                          <Tv className="w-3.5 h-3.5" />
+                          <span>Ads Buy</span>
+                        </>
+                      ) : (
+                        <>
+                          <Coins className="w-3.5 h-3.5" />
+                          <span>{item.cost}</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>

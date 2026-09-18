@@ -142,13 +142,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onBack }) => {
           <div>
             <div className="flex items-center justify-between text-xs text-slate-300 font-semibold mb-1">
               <span>Throw Sensitivity</span>
-              <span>{settings.sensitivity}%</span>
+              <span className="font-mono text-amber-400 font-bold">{settings.sensitivity}% {settings.sensitivity === 10 && '(Default)'}</span>
             </div>
             <input
               id="slider-sensitivity"
               type="range"
-              min="10"
+              min="5"
               max="100"
+              step="5"
               value={settings.sensitivity}
               onChange={(e) => updateSetting('sensitivity', parseInt(e.target.value, 10))}
               className="w-full accent-amber-500 cursor-pointer h-2 bg-slate-800 rounded-lg"

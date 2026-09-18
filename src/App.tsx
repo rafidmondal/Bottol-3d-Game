@@ -15,6 +15,7 @@ import { ProfileModal } from './components/ProfileModal';
 import { HowToPlayModal } from './components/HowToPlayModal';
 import { AboutModal } from './components/AboutModal';
 import { DailyRewardModal } from './components/DailyRewardModal';
+import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { GameCanvas } from './components/GameCanvas';
 import { SceneBuilder } from './game/sceneBuilder';
 import { getDailyRewardState, getSkinsState, getSettings } from './services/storage';
@@ -201,6 +202,9 @@ export default function App() {
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/60 pointer-events-none" />
         </div>
       )}
+
+      {/* PWA INSTALL BANNER (Top of screen when open / first time) */}
+      <PWAInstallBanner />
 
       {/* TOP HEADER BAR (Shown in menus) */}
       {isMenuScreen && (

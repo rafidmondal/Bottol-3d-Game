@@ -15,6 +15,7 @@ import {
   getSkinsState,
   recordFlip,
   recordLevelSuccess,
+  skipLevel,
   saveMatch,
   savePracticeStats,
   addCoins,
@@ -23,7 +24,8 @@ import { audio } from '../services/audio';
 import { PauseOverlay } from './PauseOverlay';
 import { MatchResultModal } from './MatchResultModal';
 import { LevelCompleteModal } from './LevelCompleteModal';
-import { Home, Pause, Hand, Timer, Star, RotateCcw, Target, Sparkles, ChevronRight } from 'lucide-react';
+import { triggerDirectAd } from '../services/adService';
+import { Home, Pause, Hand, Timer, Star, RotateCcw, Target, Sparkles, ChevronRight, FastForward } from 'lucide-react';
 
 interface GameCanvasProps {
   mode: 'friend' | 'ai' | 'level' | 'practice';
@@ -226,6 +228,56 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // Build player 1 active bottle using user's equipped bottle and cap
     const p1Bottle = sb.createBottleMesh(equippedBottle, equippedCap);
     p1Bottle.position.set(0, physicsRef.current.centerOfMassY, 0);
+
+    // Trail Glowing Aura meshes and Point Light attached directly to p1Bottle
+    const auraColorsMap: Record<string, { primary: number; secondary: number; lightColor: number }> = {
+      trailSparkle: { primary: 0xfde047, secondary: 0xfef08a, lightColor: 0xfde047 },
+      trailFire: { primary: 0xf97316, secondary: 0xef4444, lightColor: 0xff5722 },
+      trailRainbow: { primary: 0xa855f7, secondary: 0x06b6d4, lightColor: 0xec4899 },
+      trailCyan: { primary: 0x06b6d4, secondary: 0x38bdf8, lightColor: 0x00e5ff },
+      trailSakura: { primary: 0xf472b6, secondary: 0xfda4af, lightColor: 0xff69b4 },
+      trailEmerald: { primary: 0x10b981, secondary: 0x34d399, lightColor: 0x00e676 },
+      trailDragonFlame: { primary: 0xea580c, secondary: 0xfacc15, lightColor: 0xff3d00 },
+      trailCosmicVoid: { primary: 0xa855f7, secondary: 0x38bdf8, lightColor: 0x7c4dff },
+      trailHyperGold: { primary: 0xfacc15, secondary: 0xfffbeb, lightColor: 0xffd700 },
+    };
+
+    const currentTrailId = getSkinsState().equippedTrail || equippedTrail;
+    const auraConf = auraColorsMap[currentTrailId] || { primary: 0x38bdf8, secondary: 0x0284c7, lightColor: 0x38bdf8 };
+    const auraGroup = new THREE.Group();
+
+    // Inner glowing aura cylinder around bottle body
+    const innerAuraGeom = new THREE.CylinderGeometry(0.115, 0.13, 0.42, 24, 1, true);
+    const innerAuraMat = new THREE.MeshBasicMaterial({
+      color: auraConf.primary,
+      transparent: true,
+      opacity: 0.38,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const innerAuraMesh = new THREE.Mesh(innerAuraGeom, innerAuraMat);
+    auraGroup.add(innerAuraMesh);
+
+    // Outer spherical aura halo envelope
+    const outerAuraGeom = new THREE.SphereGeometry(0.22, 18, 18);
+    outerAuraGeom.scale(1, 1.35, 1);
+    const outerAuraMat = new THREE.MeshBasicMaterial({
+      color: auraConf.secondary,
+      transparent: true,
+      opacity: 0.2,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false,
+    });
+    const outerAuraMesh = new THREE.Mesh(outerAuraGeom, outerAuraMat);
+    auraGroup.add(outerAuraMesh);
+
+    // Dynamic aura point light that illuminates bottle, table, and surroundings
+    const auraLight = new THREE.PointLight(auraConf.lightColor, 2.0, 3.2);
+    auraGroup.add(auraLight);
+
+    p1Bottle.add(auraGroup);
     sb.scene.add(p1Bottle);
     p1BottleMeshRef.current = p1Bottle;
 
@@ -365,6 +417,50 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           );
         }
 
+        // Update Glowing Aura mesh and light animation
+        const auraTime = performance.now() * 0.001;
+        const isFlying = physics.state.isInFlight;
+        const pulseSpeed = isFlying ? 8.0 : 3.2;
+        const pulseAmp = isFlying ? 0.08 : 0.04;
+        const pulse = Math.sin(auraTime * pulseSpeed) * pulseAmp;
+
+        innerAuraMesh.scale.set(1 + pulse, 1 + pulse * 0.5, 1 + pulse);
+        outerAuraMesh.scale.set(1 + pulse * 1.5, 1 + pulse * 0.8, 1 + pulse * 1.5);
+        auraGroup.rotation.y += isFlying ? 0.05 : 0.015;
+
+        // Rainbow chromatic color shift
+        if (currentTrailId === 'trailRainbow') {
+          const hue = (auraTime * 0.25) % 1;
+          const rainbowColor = new THREE.Color().setHSL(hue, 1, 0.6);
+          innerAuraMat.color.copy(rainbowColor);
+          outerAuraMat.color.setHSL((hue + 0.2) % 1, 0.9, 0.6);
+          auraLight.color.copy(rainbowColor);
+        }
+
+        const targetInnerOpacity = isFlying ? 0.65 : 0.34;
+        innerAuraMat.opacity += (targetInnerOpacity - innerAuraMat.opacity) * 0.15;
+        outerAuraMat.opacity = innerAuraMat.opacity * 0.52;
+        auraLight.intensity = isFlying ? 3.8 : 1.8;
+
+        // Ambient aura floating wisps while idle on table (makes trail visible even before throwing)
+        if (!isFlying && Math.random() < 0.22 && particlePoolRef.current.length < 280) {
+          const moteLocalOffset = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.16,
+            -0.12 + Math.random() * 0.24,
+            (Math.random() - 0.5) * 0.16
+          );
+          moteLocalOffset.applyQuaternion(p1Bottle.quaternion);
+          const moteSpawnPos = p1Bottle.position.clone().add(moteLocalOffset);
+          particlePoolRef.current.push({
+            position: moteSpawnPos,
+            velocity: new THREE.Vector3((Math.random() - 0.5) * 0.04, 0.14 + Math.random() * 0.08, (Math.random() - 0.5) * 0.04),
+            color: new THREE.Color(innerAuraMat.color),
+            size: 0.055,
+            life: 0.65,
+            maxLife: 0.65,
+          });
+        }
+
         // Update Dynamic Particles (optimized pool, low memory footprint)
         if (particlesMeshRef.current) {
           const pool = particlePoolRef.current;
@@ -421,6 +517,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
                 life = 0.52;
                 extraVel.set((Math.random() - 0.5) * 0.2, 0.12, (Math.random() - 0.5) * 0.2);
+              } else if (currentTrail === 'trailDragonFlame') {
+                const colors = [0xea580c, 0xf97316, 0xffedd5, 0xef4444];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.58;
+                extraVel.set((Math.random() - 0.5) * 0.22, 0.55 + Math.random() * 0.3, (Math.random() - 0.5) * 0.22);
+              } else if (currentTrail === 'trailCosmicVoid') {
+                const colors = [0xa855f7, 0xc084fc, 0x38bdf8, 0xffffff];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.62;
+                extraVel.set((Math.random() - 0.5) * 0.25, 0.1, (Math.random() - 0.5) * 0.25);
+              } else if (currentTrail === 'trailHyperGold') {
+                const colors = [0xfacc15, 0xfef08a, 0xffd700, 0xffffff];
+                color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)]);
+                life = 0.56;
+                extraVel.set((Math.random() - 0.5) * 0.2, 0.18, (Math.random() - 0.5) * 0.2);
               }
 
               // Oppose bottle movement vector for stream trail
@@ -486,6 +597,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
       if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);
+      try {
+        innerAuraGeom.dispose();
+        innerAuraMat.dispose();
+        outerAuraGeom.dispose();
+        outerAuraMat.dispose();
+      } catch (_) {}
       if (sb) {
         sb.dispose();
         sceneBuilderRef.current = null;
@@ -546,6 +663,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const resetBottlePosition = () => {
     swapBottlePositions(turnStateRef.current.activePlayer);
+  };
+
+  const handleSkipLevelReward = () => {
+    audio.playPerfect();
+    skipLevel(currentLevel);
+    const nextLvl = currentLevel + 1;
+    setCurrentLevel(nextLvl);
+    setupLevel(nextLvl);
+    setFeedback({
+      outcome: 'PERFECT',
+      points: 100,
+      text: `LEVEL ${currentLevel} SKIPPED!`,
+      color: '#f59e0b',
+      flipsCompleted: 1,
+    });
+    setTimeout(() => setFeedback(null), 2500);
   };
 
   // AI THROW TRIGGER (Simulated bot throw)
@@ -876,6 +1009,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
         {/* Right Actions: Quick Restart + Pause */}
         <div className="flex items-center gap-2 pointer-events-auto">
+          {mode === 'level' && (
+            <button
+              id="skip-level-btn"
+              title="Skip Level (Opens Sponsor)"
+              onClick={() => {
+                audio.playButton();
+                triggerDirectAd();
+                handleSkipLevelReward();
+              }}
+              className="flex items-center gap-1 px-3 py-2 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 border border-amber-300 active:scale-95 transition-all font-['Fredoka']"
+            >
+              <FastForward className="w-3.5 h-3.5 fill-slate-950" />
+              <span>SKIP</span>
+            </button>
+          )}
           <button
             id="game-reset-btn"
             title="Reset Bottle"

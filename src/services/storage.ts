@@ -35,7 +35,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   soundFx: true,
   music: true,
   volume: 80,
-  sensitivity: 50,
+  sensitivity: 10,
   slowmo: true,
   quality: 'Auto',
   shadows: true,
@@ -121,6 +121,79 @@ export function saveProfile(profile: Partial<UserProfile>): UserProfile {
     console.error(e);
   }
   return updated;
+}
+
+export function isPhotoCustomizationUnlocked(): boolean {
+  try {
+    return localStorage.getItem('bottleflip_photo_unlocked') === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+export function unlockPhotoCustomization(): void {
+  try {
+    localStorage.setItem('bottleflip_photo_unlocked', 'true');
+    notifyListeners();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+export function isNameCustomizationUnlocked(): boolean {
+  try {
+    return getRenameCredits() > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+export function getRenameCredits(): number {
+  try {
+    const raw = localStorage.getItem('bottleflip_rename_credits');
+    if (raw !== null) {
+      const val = parseInt(raw, 10);
+      return isNaN(val) ? 0 : val;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return 0;
+}
+
+export function addRenameCredit(): number {
+  const current = getRenameCredits();
+  const next = current + 1;
+  try {
+    localStorage.setItem('bottleflip_rename_credits', next.toString());
+    localStorage.setItem('bottleflip_name_unlocked', 'true');
+    notifyListeners();
+  } catch (e) {
+    console.error(e);
+  }
+  return next;
+}
+
+export function consumeRenameCredit(): boolean {
+  const current = getRenameCredits();
+  if (current > 0) {
+    try {
+      const next = current - 1;
+      localStorage.setItem('bottleflip_rename_credits', next.toString());
+      if (next === 0) {
+        localStorage.removeItem('bottleflip_name_unlocked');
+      }
+      notifyListeners();
+    } catch (e) {
+      console.error(e);
+    }
+    return true;
+  }
+  return false;
+}
+
+export function unlockNameCustomization(): void {
+  addRenameCredit();
 }
 
 // COINS
@@ -246,6 +319,11 @@ export function recordLevelSuccess(level: number, score: number, starsEarned: nu
   }
 }
 
+export function skipLevel(level: number): void {
+  // Mark current level complete and advance
+  recordLevelSuccess(level, 100, 1);
+}
+
 // SKINS
 export function getSkinsState(): UserSkinsState {
   try {
@@ -274,7 +352,14 @@ export function saveSkinsState(skins: Partial<UserSkinsState>): UserSkinsState {
 export function getSettings(): GameSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // If user had previous uncustomized default of 50, adjust to requested default 10
+      if (parsed && (parsed.sensitivity === undefined || parsed.sensitivity === 50)) {
+        parsed.sensitivity = 10;
+      }
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
   } catch (e) {
     console.error(e);
   }

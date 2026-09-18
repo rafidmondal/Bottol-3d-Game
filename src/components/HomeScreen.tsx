@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Gamepad2, Trophy, Shirt, Star, Sparkles, User, Infinity, BookOpen } from 'lucide-react';
+import { Gamepad2, Trophy, ShoppingCart, Star, Sparkles, User, Infinity, BookOpen } from 'lucide-react';
 import { Screen } from '../types';
 import { audio } from '../services/audio';
 import { isEndlessUnlocked, getMaxUnlockedLevel } from '../services/storage';
@@ -199,17 +199,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             <span className="truncate">RANKS</span>
           </button>
 
-          {/* SKINS */}
+          {/* SKINS / SHOP (Premium Shop Button with Cart Icon) */}
           <button
             id="pill-skins"
             onClick={() => {
               audio.playButton();
               onNavigate('SKINS');
             }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-3 rounded-xl sm:rounded-full hover:bg-slate-800 text-slate-200 hover:text-white text-[10px] sm:text-xs font-black active:scale-95 transition-all font-['Fredoka']"
+            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-3.5 rounded-xl sm:rounded-full bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-yellow-500/20 hover:from-amber-500/35 hover:to-orange-500/35 border border-amber-400/40 text-amber-300 hover:text-white text-[10px] sm:text-xs font-black shadow-md shadow-amber-500/10 active:scale-95 transition-all font-['Fredoka']"
           >
-            <Shirt className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="truncate">SKINS</span>
+            <ShoppingCart className="w-4 h-4 text-amber-400 shrink-0 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
+            <span className="truncate tracking-wide font-black">SHOP</span>
           </button>
 
           {/* ACHIEVEMENTS / BADGES */}

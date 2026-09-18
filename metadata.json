@@ -1,6 +1,6 @@
 {
   "name": "Bottle Flip 3D",
-  "description": "3D bottle flipping web game with real physics, 1v1 local multiplayer, AI battle, levels, practice mode, skins, achievements, and leaderboard.",
+  "description": "3D bottle flipping progressive web app (PWA) with real physics, offline play, 1v1 local multiplayer, AI battle, levels, practice mode, skins, achievements, and leaderboard.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

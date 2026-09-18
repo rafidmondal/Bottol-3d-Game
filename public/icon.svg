@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="bottle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="cap" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f87171" />
+      <stop offset="50%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#b91c1c" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background with rounded squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <!-- Outer Ring Accent -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#38bdf8" stroke-width="4" stroke-opacity="0.3" stroke-dasharray="16 12" />
+
+  <!-- Motion Flip Arc Trail -->
+  <path d="M 140 370 A 150 150 0 0 1 350 160" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" filter="url(#glow)" />
+  <circle cx="140" cy="370" r="10" fill="#fde047" />
+  <circle cx="210" cy="220" r="7" fill="#fde047" />
+  <circle cx="350" cy="160" r="12" fill="#fde047" filter="url(#glow)" />
+
+  <!-- Star Accents -->
+  <polygon points="380,120 385,135 400,135 388,144 392,158 380,149 368,158 372,144 360,135 375,135" fill="url(#gold)" />
+  <polygon points="120,200 123,210 133,210 125,216 128,226 120,220 112,226 115,216 107,210 117,210" fill="#38bdf8" opacity="0.8" />
+
+  <!-- Rotating Centered Bottle in 3D Motion (Rotated ~20 deg) -->
+  <g transform="translate(256, 265) rotate(-18) translate(-256, -265)">
+    <!-- Bottle Aura Glow -->
+    <ellipse cx="256" cy="275" rx="60" ry="120" fill="#0284c7" opacity="0.28" filter="url(#glow)" />
+
+    <!-- Bottle Body Glass -->
+    <rect x="216" y="210" width="80" height="150" rx="18" fill="url(#bottle)" stroke="#7dd3fc" stroke-width="4" filter="url(#glow)" />
+
+    <!-- Internal Liquid Line -->
+    <rect x="222" y="270" width="68" height="84" rx="12" fill="#0284c7" opacity="0.85" />
+    <path d="M 222 270 Q 239 265, 256 270 T 290 270 L 290 342 Q 290 354, 278 354 L 234 354 Q 222 354, 222 342 Z" fill="#38bdf8" opacity="0.6" />
+
+    <!-- Label with 3D FLIP text -->
+    <rect x="220" y="272" width="72" height="38" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+    <text x="256" y="296" text-anchor="middle" font-family="'Fredoka', sans-serif" font-weight="900" font-size="19" fill="#ffffff" letter-spacing="2">FLIP</text>
+
+    <!-- Bottle Neck -->
+    <rect x="240" y="165" width="32" height="48" rx="6" fill="url(#bottle)" stroke="#7dd3fc" stroke-width="3" />
+
+    <!-- Bottle Cap -->
+    <rect x="234" y="148" width="44" height="20" rx="6" fill="url(#cap)" stroke="#fca5a5" stroke-width="2" filter="url(#glow)" />
+    <!-- Cap Ridges -->
+    <line x1="242" y1="152" x2="242" y2="164" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.6" />
+    <line x1="250" y1="152" x2="250" y2="164" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.6" />
+    <line x1="258" y1="152" x2="258" y2="164" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.6" />
+    <line x1="266" y1="152" x2="266" y2="164" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.6" />
+
+    <!-- Gloss Specular Highlight -->
+    <path d="M 224 220 L 224 345 Q 224 350, 228 350 L 230 350 L 230 220 Z" fill="#ffffff" opacity="0.4" />
+  </g>
+</svg>

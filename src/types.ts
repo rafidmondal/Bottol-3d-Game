@@ -27,6 +27,7 @@ export interface UserProfile {
   name: string;
   avatar: string;
   avatarColor: string;
+  photoBase64?: string;
 }
 
 export interface GameSettings {
@@ -51,7 +52,10 @@ export type BottleShape =
   | 'sport'
   | 'diamond'
   | 'gold'
-  | 'galaxy';
+  | 'galaxy'
+  | 'dragon'
+  | 'cyber'
+  | 'royal';
 
 export interface SkinItem {
   id: string;
@@ -70,6 +74,7 @@ export interface SkinItem {
   liquidColor?: string;
   labelText?: string;
   tag?: string;
+  unlockType?: 'coins' | 'ad';
 }
 
 export interface UserSkinsState {
